@@ -26,8 +26,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 document.documentElement.style.setProperty('--hue', hue);
                 document.documentElement.style.setProperty('--lightness', lightness + '%');
                 const bgHex = window.hslToHex(hue + 120, 50, 95);
-                if (metaThemeColor) metaThemeColor.setAttribute("content", bgHex);
-                document.documentElement.style.backgroundColor = bgHex;
+                if (metaThemeColor) metaThemeColor.setAttribute("content", "#000000");
+                document.documentElement.style.backgroundColor = "#000000";
                 if (edgeBgLayer) edgeBgLayer.style.backgroundColor = bgHex;
             }
 
@@ -369,71 +369,128 @@ document.addEventListener("DOMContentLoaded", () => {
                         });
                         card.appendChild(orderBtn);
 
-                        // 3. Android-Style Horizontal Resize Handle (right edge dot ↔)
+                        // 3. Android-Style Horizontal Resize Handle (right edge dot ↔) with REAL-TIME DRAG
                         const handleX = document.createElement("div");
                         handleX.className = "w-resize-handle-x";
-                        handleX.title = "Breite ändern (Klick oder Ziehen)";
-                        const toggleSpan = (e) => {
-                            if (e) e.stopPropagation();
-                            wCfg.span = (wCfg.span === 2) ? 1 : 2;
+                        handleX.title = "Breite stufenlos ziehen";
+
+                        let hxActive = false;
+                        let hxStartX = 0;
+                        let hxStartWidth = 0;
+                        let hxGridWidth = 0;
+                        let hxTargetSpan = wCfg.span;
+
+                        const onHxDown = (e) => {
+                            e.stopPropagation();
+                            hxActive = true;
+                            hxStartX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                            hxGridWidth = (homeWidgetGrid && homeWidgetGrid.getBoundingClientRect().width) || 360;
+                            hxStartWidth = card.getBoundingClientRect().width;
+                            hxTargetSpan = wCfg.span;
+                            card.classList.add("is-resizing");
+                            card.style.transition = "none";
+                            try { handleX.setPointerCapture(e.pointerId); } catch(err) {}
+                        };
+
+                        const onHxMove = (e) => {
+                            if (!hxActive) return;
+                            e.stopPropagation();
+                            const clientX = e.clientX || (e.touches && e.touches[0].clientX) || 0;
+                            const currentDelta = clientX - hxStartX;
+                            const newWidth = Math.max(90, Math.min(hxGridWidth, hxStartWidth + currentDelta));
+                            card.style.width = newWidth + "px";
+                            hxTargetSpan = (newWidth > hxGridWidth * 0.58) ? 2 : 1;
+                            sizeIndicator.textContent = `${hxTargetSpan === 2 ? "Voll (2)" : "Halb (1)"} · ${wCfg.size.toUpperCase()}`;
+                        };
+
+                        const onHxUp = (e) => {
+                            if (!hxActive) return;
+                            hxActive = false;
+                            e.stopPropagation();
+                            try { handleX.releasePointerCapture(e.pointerId); } catch(err) {}
+                            card.classList.remove("is-resizing");
+                            card.style.transition = "";
+                            card.style.width = "";
+
+                            const clientX = e.clientX || (e.changedTouches && e.changedTouches[0].clientX) || 0;
+                            if (Math.abs(clientX - hxStartX) < 10) {
+                                wCfg.span = (wCfg.span === 2) ? 1 : 2;
+                            } else {
+                                wCfg.span = hxTargetSpan;
+                            }
                             saveHomeWidgets();
                             renderHomeWidgetGrid();
                         };
-                        handleX.addEventListener("click", toggleSpan);
-                        let hxStartX = 0;
-                        handleX.addEventListener("pointerdown", (e) => {
-                            e.stopPropagation();
-                            hxStartX = e.clientX;
-                            const onMove = (ev) => {
-                                const dx = ev.clientX - hxStartX;
-                                if (Math.abs(dx) > 30) {
-                                    handleX.removeEventListener("pointermove", onMove);
-                                    window.removeEventListener("pointerup", onUp);
-                                    toggleSpan();
-                                }
-                            };
-                            const onUp = () => {
-                                handleX.removeEventListener("pointermove", onMove);
-                                window.removeEventListener("pointerup", onUp);
-                            };
-                            handleX.addEventListener("pointermove", onMove);
-                            window.addEventListener("pointerup", onUp);
-                        });
+
+                        handleX.addEventListener("pointerdown", onHxDown);
+                        handleX.addEventListener("pointermove", onHxMove);
+                        handleX.addEventListener("pointerup", onHxUp);
+                        handleX.addEventListener("pointercancel", onHxUp);
                         card.appendChild(handleX);
 
-                        // 4. Android-Style Vertical Resize Handle (bottom edge dot ↕)
+                        // 4. Android-Style Vertical Resize Handle (bottom edge dot ↕) with REAL-TIME DRAG
                         const handleY = document.createElement("div");
                         handleY.className = "w-resize-handle-y";
-                        handleY.title = "Höhe ändern (Klick oder Ziehen)";
-                        const toggleSize = (e) => {
-                            if (e) e.stopPropagation();
-                            const sizes = ["s", "m", "l"];
-                            wCfg.size = sizes[(sizes.indexOf(wCfg.size) + 1) % sizes.length];
+                        handleY.title = "Höhe stufenlos ziehen";
+
+                        let hyActive = false;
+                        let hyStartY = 0;
+                        let hyStartHeight = 0;
+                        let hyTargetSize = wCfg.size;
+
+                        const onHyDown = (e) => {
+                            e.stopPropagation();
+                            hyActive = true;
+                            hyStartY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+                            hyStartHeight = card.getBoundingClientRect().height;
+                            hyTargetSize = wCfg.size;
+                            card.classList.add("is-resizing");
+                            card.style.transition = "none";
+                            try { handleY.setPointerCapture(e.pointerId); } catch(err) {}
+                        };
+
+                        const onHyMove = (e) => {
+                            if (!hyActive) return;
+                            e.stopPropagation();
+                            const clientY = e.clientY || (e.touches && e.touches[0].clientY) || 0;
+                            const currentDelta = clientY - hyStartY;
+                            const newHeight = Math.max(64, Math.min(240, hyStartHeight + currentDelta));
+                            card.style.minHeight = newHeight + "px";
+                            card.style.height = newHeight + "px";
+
+                            if (newHeight < 84) hyTargetSize = "s";
+                            else if (newHeight <= 124) hyTargetSize = "m";
+                            else hyTargetSize = "l";
+
+                            sizeIndicator.textContent = `${(wCfg.span === 2 ? "Voll (2)" : "Halb (1)")} · ${hyTargetSize.toUpperCase()}`;
+                        };
+
+                        const onHyUp = (e) => {
+                            if (!hyActive) return;
+                            hyActive = false;
+                            e.stopPropagation();
+                            try { handleY.releasePointerCapture(e.pointerId); } catch(err) {}
+                            card.classList.remove("is-resizing");
+                            card.style.transition = "";
+                            card.style.minHeight = "";
+                            card.style.height = "";
+
+                            const clientY = e.clientY || (e.changedTouches && e.changedTouches[0].clientY) || 0;
+                            if (Math.abs(clientY - hyStartY) < 10) {
+                                const sizes = ["s", "m", "l"];
+                                wCfg.size = sizes[(sizes.indexOf(wCfg.size) + 1) % sizes.length];
+                            } else {
+                                wCfg.size = hyTargetSize;
+                            }
                             saveHomeWidgets();
                             renderHomeWidgetGrid();
                         };
-                        handleY.addEventListener("click", toggleSize);
-                        let hyStartY = 0;
-                        handleY.addEventListener("pointerdown", (e) => {
-                            e.stopPropagation();
-                            hyStartY = e.clientY;
-                            const onMove = (ev) => {
-                                const dy = ev.clientY - hyStartY;
-                                if (Math.abs(dy) > 28) {
-                                    handleY.removeEventListener("pointermove", onMove);
-                                    window.removeEventListener("pointerup", onUp);
-                                    toggleSize();
-                                }
-                            };
-                            const onUp = () => {
-                                handleY.removeEventListener("pointermove", onMove);
-                                window.removeEventListener("pointerup", onUp);
-                            };
-                            handleY.addEventListener("pointermove", onMove);
-                            window.addEventListener("pointerup", onUp);
-                        });
-                        card.appendChild(handleY);
 
+                        handleY.addEventListener("pointerdown", onHyDown);
+                        handleY.addEventListener("pointermove", onHyMove);
+                        handleY.addEventListener("pointerup", onHyUp);
+                        handleY.addEventListener("pointercancel", onHyUp);
+                        card.appendChild(handleY);
                         // 5. Size Indicator badge
                         const sizeIndicator = document.createElement("div");
                         sizeIndicator.className = "w-resize-indicator";
@@ -2713,72 +2770,108 @@ document.addEventListener("DOMContentLoaded", () => {
                 pdfExportModal.classList.remove("active");
             });
 
-            // Gestures on App Shell (3-Screen Navigation: Menü <-> Startbildschirm <-> Woche)
-            // Unterstützt Touch & Maus-Drag
-            let mainDragStartX = 0;
-            let mainDragStartY = 0;
-            let mainDragging = false;
-            const appShell = document.querySelector(".app-shell");
+            // SPATIAL NAVIGATION: Buttons & Bidirectional 4-Way Gestures
+            // (Center: Wischschirm <===> Left: Menü/Stempeluhr <===> Right: Wochenbilanz)
 
-            function onAppDragStart(clientX, clientY, target) {
-                if (!gesturesEnabled || welcomeOverlay.classList.contains("active")) return false;
-                if (target.closest("input, select, textarea, button, .modal-overlay, #colorWheel, .nudge-btn, .kw-v-btn")) return false;
-                mainDragging = true;
-                mainDragStartX = clientX;
-                mainDragStartY = clientY;
-                return true;
+            // Click listener for Home button & App Title
+            const btnGoHome = document.getElementById("btn-go-home");
+            const appTitleEl = document.getElementById("app-title");
+            function returnToHomeScreen() {
+                const isRunning = (startHoursInput.value !== "" && endHoursInput.value === "");
+                openWelcomeScreen(welcomeActionMode || (isRunning ? "go" : "come"));
+            }
+            if (btnGoHome) btnGoHome.addEventListener("click", returnToHomeScreen);
+            if (appTitleEl) appTitleEl.addEventListener("click", returnToHomeScreen);
+
+            // Bottom Navigation Pills on Menü & Woche
+            const navBtnHomeFromClock = document.getElementById("nav-btn-home-from-clock");
+            const navBtnWeekFromClock = document.getElementById("nav-btn-week-from-clock");
+            const navBtnHomeFromWeek = document.getElementById("nav-btn-home-from-week");
+            const navBtnClockFromWeek = document.getElementById("nav-btn-clock-from-week");
+
+            if (navBtnHomeFromClock) navBtnHomeFromClock.addEventListener("click", returnToHomeScreen);
+            if (navBtnWeekFromClock) navBtnWeekFromClock.addEventListener("click", switchToWeekView);
+            if (navBtnHomeFromWeek) navBtnHomeFromWeek.addEventListener("click", returnToHomeScreen);
+            if (navBtnClockFromWeek) navBtnClockFromWeek.addEventListener("click", switchToClockView);
+
+            // GLOBAL BIDIRECTIONAL 4-WAY GESTURE CONTROLLER (Never get trapped)
+            let gSwipeStartX = 0;
+            let gSwipeStartY = 0;
+            let gSwipeActive = false;
+
+            function isTargetInteractive(target) {
+                return !!target.closest("input, select, textarea, button, .modal-overlay, #colorWheel, .nudge-btn, .kw-v-btn, .w-resize-handle-x, .w-resize-handle-y");
             }
 
-            function onAppDragEnd(clientX, clientY) {
-                if (!mainDragging) return;
-                mainDragging = false;
-                const dx = clientX - mainDragStartX;
-                const dy = clientY - mainDragStartY;
+            // Global Touch listener on document
+            document.addEventListener("touchstart", (e) => {
+                if (!gesturesEnabled || welcomeOverlay.classList.contains("active") || e.touches.length !== 1) return;
+                if (isTargetInteractive(e.target)) return;
+                gSwipeActive = true;
+                gSwipeStartX = e.touches[0].clientX;
+                gSwipeStartY = e.touches[0].clientY;
+            }, { passive: true });
+
+            document.addEventListener("touchend", (e) => {
+                if (!gesturesEnabled || !gSwipeActive || welcomeOverlay.classList.contains("active") || e.changedTouches.length !== 1) return;
+                gSwipeActive = false;
+                if (isTargetInteractive(e.target)) return;
+
+                const dx = e.changedTouches[0].clientX - gSwipeStartX;
+                const dy = e.changedTouches[0].clientY - gSwipeStartY;
                 const absX = Math.abs(dx);
                 const absY = Math.abs(dy);
 
-                if (absX > 50 && absX > absY * 1.2) {
+                if (absX > 42 && absX > absY * 1.1) {
                     if (viewClock.classList.contains("active")) {
                         if (dx > 0) {
-                            returnToHomeScreen(); // Swipe RIGHT: Zurück zum Wischschirm
+                            returnToHomeScreen(); // Swipe RIGHT from Menü -> Back to Wischschirm!
                         } else {
-                            switchToWeekView();   // Swipe LEFT: Zur Wochenbilanz
+                            switchToWeekView();   // Swipe LEFT from Menü -> To Woche!
                         }
                     } else if (viewWeek.classList.contains("active")) {
                         if (dx < 0) {
-                            returnToHomeScreen(); // Swipe LEFT: Zurück zum Wischschirm
+                            returnToHomeScreen(); // Swipe LEFT from Woche -> Back to Wischschirm!
                         } else {
-                            switchToClockView();  // Swipe RIGHT: Zur Stempeluhr
+                            switchToClockView();  // Swipe RIGHT from Woche -> To Menü!
                         }
                     }
-                } else if (dy > 65 && absY > absX * 1.25 && mainDragStartY < 120) {
-                    returnToHomeScreen(); // Pull DOWN am Header: Zurück zum Wischschirm
+                } else if (dy > 55 && absY > absX * 1.2) {
+                    returnToHomeScreen(); // Pull DOWN anywhere from top -> Back to Wischschirm!
                 }
-            }
+            }, { passive: true });
 
-            if (appShell) {
-                appShell.addEventListener("touchstart", (e) => {
-                    if (e.touches.length === 1) {
-                        onAppDragStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
-                    }
-                }, { passive: true });
+            // Global Mouse Drag listener for desktop testing
+            document.addEventListener("mousedown", (e) => {
+                if (!gesturesEnabled || welcomeOverlay.classList.contains("active") || e.button !== 0) return;
+                if (isTargetInteractive(e.target)) return;
+                gSwipeActive = true;
+                gSwipeStartX = e.clientX;
+                gSwipeStartY = e.clientY;
 
-                appShell.addEventListener("touchend", (e) => {
-                    if (mainDragging && e.changedTouches.length === 1) {
-                        onAppDragEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
-                    }
-                }, { passive: true });
+                const onGMouseUp = (ev) => {
+                    window.removeEventListener("mouseup", onGMouseUp);
+                    if (!gSwipeActive) return;
+                    gSwipeActive = false;
+                    const dx = ev.clientX - gSwipeStartX;
+                    const dy = ev.clientY - gSwipeStartY;
+                    const absX = Math.abs(dx);
+                    const absY = Math.abs(dy);
 
-                appShell.addEventListener("mousedown", (e) => {
-                    if (e.button === 0 && onAppDragStart(e.clientX, e.clientY, e.target)) {
-                        const onUp = (ev) => {
-                            window.removeEventListener("mouseup", onUp);
-                            onAppDragEnd(ev.clientX, ev.clientY);
-                        };
-                        window.addEventListener("mouseup", onUp);
+                    if (absX > 42 && absX > absY * 1.1) {
+                        if (viewClock.classList.contains("active")) {
+                            if (dx > 0) returnToHomeScreen();
+                            else switchToWeekView();
+                        } else if (viewWeek.classList.contains("active")) {
+                            if (dx < 0) returnToHomeScreen();
+                            else switchToClockView();
+                        }
+                    } else if (dy > 55 && absY > absX * 1.2) {
+                        returnToHomeScreen();
                     }
-                });
-            }
+                };
+                window.addEventListener("mouseup", onGMouseUp);
+            });
 
             // Live clock update loop
             function updateLiveClock() {

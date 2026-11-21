@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" id="meta-theme-color" content="#eef7fa">
+    <meta name="theme-color" id="meta-theme-color" content="#000000">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -13,7 +13,7 @@
     <link rel="apple-touch-icon" href="favicon.png">
     <link rel="stylesheet" href="style.css">
     <script>
-        const APP_VERSION = "1.23";
+        const APP_VERSION = "1.24";
 
         window.hslToHex = function(h, s, l) {
             h = ((h % 360) + 360) % 360;
@@ -41,9 +41,9 @@
             document.documentElement.style.setProperty("--asym-intensity", (safeAsym / 100).toFixed(3));
 
             const bgHex = window.hslToHex(safeHue + 120, 50, 95);
-            document.documentElement.style.backgroundColor = bgHex;
+            document.documentElement.style.backgroundColor = "#000000";
             const meta = document.getElementById("meta-theme-color");
-            if (meta) meta.setAttribute("content", bgHex);
+            if (meta) meta.setAttribute("content", "#000000");
         })();
     </script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
@@ -192,6 +192,10 @@
                             <div id="output-overtime">-</div>
                         </div>
                     </div>
+                    <div class="spatial-nav-pills">
+                        <button type="button" class="spatial-nav-btn" id="nav-btn-home-from-clock">⌂ Wischschirm</button>
+                        <button type="button" class="spatial-nav-btn" id="nav-btn-week-from-clock">Wochenbilanz →</button>
+                    </div>
                 </div>
             </div>
 
@@ -256,6 +260,10 @@
                             <span class="glz-dot"></span>
                             <span id="glzPillText">GLZ: +0,00h (Grün · noch 40,0h bis Gelb)</span>
                         </div>
+                    </div>
+                    <div class="spatial-nav-pills">
+                        <button type="button" class="spatial-nav-btn" id="nav-btn-home-from-week">⌂ Wischschirm</button>
+                        <button type="button" class="spatial-nav-btn" id="nav-btn-clock-from-week">← Stempeluhr</button>
                     </div>
                 </div>
             </div>
@@ -423,7 +431,7 @@
                 </div>
 
                 <div class="version-update-bar">
-                    <span id="app-version-label" style="font-weight:bold;">Version 1.23</span>
+                    <span id="app-version-label" style="font-weight:bold;">Version 1.24</span>
                     <button type="button" class="btn-force-update" id="btn-force-update">↻ Update erzwingen</button>
                 </div>
 
