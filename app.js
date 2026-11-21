@@ -333,41 +333,112 @@ document.addEventListener("DOMContentLoaded", () => {
                     card.style.setProperty("--w-radius", radius);
 
                     if (isEditingHomeWidgets) {
-                        const ctrl = document.createElement("div");
-                        ctrl.className = "widget-edit-controls";
-                        ctrl.innerHTML = `
-                            <div class="w-ctrl-group">
-                                <button type="button" class="w-ctrl-btn" data-act="up" title="Nach oben">▲</button>
-                                <button type="button" class="w-ctrl-btn" data-act="down" title="Nach unten">▼</button>
-                            </div>
-                            <div class="w-ctrl-group">
-                                <button type="button" class="w-ctrl-btn" data-act="span" title="Breite wechseln">${wCfg.span === 2 ? "Breit" : "Halb"}</button>
-                                <button type="button" class="w-ctrl-btn" data-act="size" title="Höhe wechseln">${wCfg.size.toUpperCase()}</button>
-                                ${homeWidgets.length > 1 ? `<button type="button" class="w-ctrl-btn danger" data-act="del" title="Entfernen">×</button>` : ""}
-                            </div>
-                        `;
-                        ctrl.querySelectorAll(".w-ctrl-btn").forEach(btn => {
-                            btn.addEventListener("click", (e) => {
+                        card.classList.add("is-editing-widget");
+
+                        // 1. Android-Style Delete button (top-right red circle)
+                        if (homeWidgets.length > 1) {
+                            const delBtn = document.createElement("button");
+                            delBtn.type = "button";
+                            delBtn.className = "w-handle-del";
+                            delBtn.title = "Widget entfernen";
+                            delBtn.innerHTML = "×";
+                            delBtn.addEventListener("click", (e) => {
                                 e.stopPropagation();
-                                const act = btn.getAttribute("data-act");
-                                if (act === "up" && idx > 0) {
-                                    [homeWidgets[idx - 1], homeWidgets[idx]] = [homeWidgets[idx], homeWidgets[idx - 1]];
-                                } else if (act === "down" && idx < homeWidgets.length - 1) {
-                                    [homeWidgets[idx + 1], homeWidgets[idx]] = [homeWidgets[idx], homeWidgets[idx + 1]];
-                                } else if (act === "span") {
-                                    wCfg.span = wCfg.span === 2 ? 1 : 2;
-                                } else if (act === "size") {
-                                    const order = ["s", "m", "l"];
-                                    wCfg.size = order[(order.indexOf(wCfg.size) + 1) % order.length];
-                                } else if (act === "del") {
-                                    homeWidgets.splice(idx, 1);
-                                }
+                                homeWidgets.splice(idx, 1);
                                 saveHomeWidgets();
                                 renderHomeWidgetGrid();
-                                updateHomeWidgetsLiveData();
                             });
+                            card.appendChild(delBtn);
+                        }
+
+                        // 2. Android-Style Reorder handle (top-left circle)
+                        const orderBtn = document.createElement("button");
+                        orderBtn.type = "button";
+                        orderBtn.className = "w-handle-order";
+                        orderBtn.title = "Position wechseln";
+                        orderBtn.innerHTML = "⇅";
+                        orderBtn.addEventListener("click", (e) => {
+                            e.stopPropagation();
+                            if (idx < homeWidgets.length - 1) {
+                                [homeWidgets[idx], homeWidgets[idx + 1]] = [homeWidgets[idx + 1], homeWidgets[idx]];
+                            } else if (idx > 0) {
+                                [homeWidgets[idx], homeWidgets[0]] = [homeWidgets[0], homeWidgets[idx]];
+                            }
+                            saveHomeWidgets();
+                            renderHomeWidgetGrid();
                         });
-                        card.appendChild(ctrl);
+                        card.appendChild(orderBtn);
+
+                        // 3. Android-Style Horizontal Resize Handle (right edge dot ↔)
+                        const handleX = document.createElement("div");
+                        handleX.className = "w-resize-handle-x";
+                        handleX.title = "Breite ändern (Klick oder Ziehen)";
+                        const toggleSpan = (e) => {
+                            if (e) e.stopPropagation();
+                            wCfg.span = (wCfg.span === 2) ? 1 : 2;
+                            saveHomeWidgets();
+                            renderHomeWidgetGrid();
+                        };
+                        handleX.addEventListener("click", toggleSpan);
+                        let hxStartX = 0;
+                        handleX.addEventListener("pointerdown", (e) => {
+                            e.stopPropagation();
+                            hxStartX = e.clientX;
+                            const onMove = (ev) => {
+                                const dx = ev.clientX - hxStartX;
+                                if (Math.abs(dx) > 30) {
+                                    handleX.removeEventListener("pointermove", onMove);
+                                    window.removeEventListener("pointerup", onUp);
+                                    toggleSpan();
+                                }
+                            };
+                            const onUp = () => {
+                                handleX.removeEventListener("pointermove", onMove);
+                                window.removeEventListener("pointerup", onUp);
+                            };
+                            handleX.addEventListener("pointermove", onMove);
+                            window.addEventListener("pointerup", onUp);
+                        });
+                        card.appendChild(handleX);
+
+                        // 4. Android-Style Vertical Resize Handle (bottom edge dot ↕)
+                        const handleY = document.createElement("div");
+                        handleY.className = "w-resize-handle-y";
+                        handleY.title = "Höhe ändern (Klick oder Ziehen)";
+                        const toggleSize = (e) => {
+                            if (e) e.stopPropagation();
+                            const sizes = ["s", "m", "l"];
+                            wCfg.size = sizes[(sizes.indexOf(wCfg.size) + 1) % sizes.length];
+                            saveHomeWidgets();
+                            renderHomeWidgetGrid();
+                        };
+                        handleY.addEventListener("click", toggleSize);
+                        let hyStartY = 0;
+                        handleY.addEventListener("pointerdown", (e) => {
+                            e.stopPropagation();
+                            hyStartY = e.clientY;
+                            const onMove = (ev) => {
+                                const dy = ev.clientY - hyStartY;
+                                if (Math.abs(dy) > 28) {
+                                    handleY.removeEventListener("pointermove", onMove);
+                                    window.removeEventListener("pointerup", onUp);
+                                    toggleSize();
+                                }
+                            };
+                            const onUp = () => {
+                                handleY.removeEventListener("pointermove", onMove);
+                                window.removeEventListener("pointerup", onUp);
+                            };
+                            handleY.addEventListener("pointermove", onMove);
+                            window.addEventListener("pointerup", onUp);
+                        });
+                        card.appendChild(handleY);
+
+                        // 5. Size Indicator badge
+                        const sizeIndicator = document.createElement("div");
+                        sizeIndicator.className = "w-resize-indicator";
+                        sizeIndicator.textContent = `${wCfg.span === 2 ? "Voll" : "Halb"} · ${wCfg.size.toUpperCase()}`;
+                        card.appendChild(sizeIndicator);
                     }
 
                     const body = document.createElement("div");
@@ -858,62 +929,109 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
 
-            /* 4-RICHTUNGS-GESTEN IM HOME-SCREEN (KOMMEN <-> GEHEN <-> MENÜ <-> WOCHE) */
-            let welcomeTouchStartX = 0;
-            let welcomeTouchStartY = 0;
-            let welcomeSwiping = false;
-            let welcomeAxis = null;
+            /* 4-RICHTUNGS-GESTEN IM WISCHSCHIRM (KOMMEN <-> GEHEN <-> MENÜ <-> WOCHE)
+               Unterstützt Touch UND Maus-Drag flüssig ohne Viewport-Bouncing */
+            let wDragStartX = 0;
+            let wDragStartY = 0;
+            let wDragging = false;
+            let wAxis = null;
 
-            welcomeOverlay.addEventListener("touchstart", (e) => {
-                if (!gesturesEnabled || isEditingHomeWidgets || e.touches.length !== 1) return;
-                if (e.target.closest("input, select, textarea")) return;
-                const x = e.touches[0].clientX;
-                if (x < 24 || x > window.innerWidth - 24) return;
-                welcomeSwiping = true;
-                welcomeAxis = null;
-                welcomeTouchStartX = x;
-                welcomeTouchStartY = e.touches[0].clientY;
-            }, { passive: true });
+            function onSwipeDragStart(clientX, clientY, target) {
+                if (!gesturesEnabled || isEditingHomeWidgets) return false;
+                if (target.closest("input, select, textarea, button, .w-resize-handle-x, .w-resize-handle-y, .w-handle-del, .w-handle-order")) return false;
+                wDragging = true;
+                wAxis = null;
+                wDragStartX = clientX;
+                wDragStartY = clientY;
+                return true;
+            }
 
-            welcomeOverlay.addEventListener("touchmove", (e) => {
-                if (!gesturesEnabled || !welcomeSwiping || e.touches.length !== 1) return;
-                const dx = e.touches[0].clientX - welcomeTouchStartX;
-                const dy = e.touches[0].clientY - welcomeTouchStartY;
-                if (!welcomeAxis && (Math.abs(dx) > 10 || Math.abs(dy) > 10)) {
-                    welcomeAxis = Math.abs(dx) >= Math.abs(dy) ? "x" : "y";
+            function onSwipeDragMove(clientX, clientY) {
+                if (!wDragging) return;
+                const dx = clientX - wDragStartX;
+                const dy = clientY - wDragStartY;
+                const absX = Math.abs(dx);
+                const absY = Math.abs(dy);
+
+                if (!wAxis && (absX > 8 || absY > 8)) {
+                    wAxis = absX >= absY ? "x" : "y";
                 }
-                if (welcomeAxis === "y") {
-                    const dampedY = Math.max(-65, Math.min(65, dy * 0.38));
+
+                if (wAxis === "y") {
+                    const dampedY = Math.max(-80, Math.min(80, dy * 0.45));
                     welcomeOverlay.style.transition = "none";
                     welcomeOverlay.style.transform = `translateY(${dampedY}px)`;
-                } else if (welcomeAxis === "x") {
-                    const dampedX = Math.max(-75, Math.min(75, dx * 0.42));
+                } else if (wAxis === "x") {
+                    const dampedX = Math.max(-85, Math.min(85, dx * 0.45));
                     welcomeOverlay.style.transition = "none";
                     welcomeOverlay.style.transform = `translateX(${dampedX}px)`;
                 }
-            }, { passive: true });
+            }
 
-            welcomeOverlay.addEventListener("touchend", (e) => {
-                if (!gesturesEnabled || !welcomeSwiping || e.changedTouches.length !== 1) return;
-                welcomeSwiping = false;
-                const dx = e.changedTouches[0].clientX - welcomeTouchStartX;
-                const dy = e.changedTouches[0].clientY - welcomeTouchStartY;
+            function onSwipeDragEnd(clientX, clientY) {
+                if (!wDragging) return;
+                wDragging = false;
+                const dx = clientX - wDragStartX;
+                const dy = clientY - wDragStartY;
+                const absX = Math.abs(dx);
+                const absY = Math.abs(dy);
 
-                welcomeOverlay.style.transition = "transform 0.2s ease-out";
+                welcomeOverlay.style.transition = "transform 0.22s cubic-bezier(0.2, 0.9, 0.3, 1)";
                 welcomeOverlay.style.transform = "";
 
-                if (welcomeAxis === "y" && Math.abs(dy) > 60 && Math.abs(dy) > Math.abs(dx) * 1.25) {
-                    openWelcomeScreen(dy < 0 ? "come" : "go");
-                } else if (welcomeAxis === "x" && Math.abs(dx) > 60 && Math.abs(dx) > Math.abs(dy) * 1.25) {
+                if (wAxis === "y" && absY > 48 && absY > absX * 1.15) {
+                    if (dy < 0) {
+                        // Swipe UP -> Kommen
+                        openWelcomeScreen("come");
+                    } else {
+                        // Swipe DOWN -> Gehen
+                        openWelcomeScreen("go");
+                    }
+                } else if (wAxis === "x" && absX > 48 && absX > absY * 1.15) {
                     if (dx < 0) {
+                        // Swipe LEFT -> Menü (view-clock)
                         closeWelcomeScreen();
                         switchToClockView();
                     } else {
+                        // Swipe RIGHT -> Woche (view-week)
                         closeWelcomeScreen();
                         switchToWeekView();
                     }
                 }
+            }
+
+            // Touch-Events
+            welcomeOverlay.addEventListener("touchstart", (e) => {
+                if (e.touches.length === 1) {
+                    onSwipeDragStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
+                }
             }, { passive: true });
+
+            welcomeOverlay.addEventListener("touchmove", (e) => {
+                if (wDragging && e.touches.length === 1) {
+                    onSwipeDragMove(e.touches[0].clientX, e.touches[0].clientY);
+                }
+            }, { passive: true });
+
+            welcomeOverlay.addEventListener("touchend", (e) => {
+                if (wDragging && e.changedTouches.length === 1) {
+                    onSwipeDragEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
+                }
+            }, { passive: true });
+
+            // Maus-Drag-Events (für Desktop/Testing)
+            welcomeOverlay.addEventListener("mousedown", (e) => {
+                if (e.button === 0 && onSwipeDragStart(e.clientX, e.clientY, e.target)) {
+                    const onMouseMove = (ev) => onSwipeDragMove(ev.clientX, ev.clientY);
+                    const onMouseUp = (ev) => {
+                        window.removeEventListener("mousemove", onMouseMove);
+                        window.removeEventListener("mouseup", onMouseUp);
+                        onSwipeDragEnd(ev.clientX, ev.clientY);
+                    };
+                    window.addEventListener("mousemove", onMouseMove);
+                    window.addEventListener("mouseup", onMouseUp);
+                }
+            });
 
             /* =========================================================
                ANSICHTEN-NAVIGATION (MENÜ <-> WOCHENBILANZ)
@@ -2596,53 +2714,70 @@ document.addEventListener("DOMContentLoaded", () => {
             });
 
             // Gestures on App Shell (3-Screen Navigation: Menü <-> Startbildschirm <-> Woche)
-            let mainTouchStartX = 0;
-            let mainTouchStartY = 0;
-            let mainTouchSwiping = false;
+            // Unterstützt Touch & Maus-Drag
+            let mainDragStartX = 0;
+            let mainDragStartY = 0;
+            let mainDragging = false;
             const appShell = document.querySelector(".app-shell");
+
+            function onAppDragStart(clientX, clientY, target) {
+                if (!gesturesEnabled || welcomeOverlay.classList.contains("active")) return false;
+                if (target.closest("input, select, textarea, button, .modal-overlay, #colorWheel, .nudge-btn, .kw-v-btn")) return false;
+                mainDragging = true;
+                mainDragStartX = clientX;
+                mainDragStartY = clientY;
+                return true;
+            }
+
+            function onAppDragEnd(clientX, clientY) {
+                if (!mainDragging) return;
+                mainDragging = false;
+                const dx = clientX - mainDragStartX;
+                const dy = clientY - mainDragStartY;
+                const absX = Math.abs(dx);
+                const absY = Math.abs(dy);
+
+                if (absX > 50 && absX > absY * 1.2) {
+                    if (viewClock.classList.contains("active")) {
+                        if (dx > 0) {
+                            returnToHomeScreen(); // Swipe RIGHT: Zurück zum Wischschirm
+                        } else {
+                            switchToWeekView();   // Swipe LEFT: Zur Wochenbilanz
+                        }
+                    } else if (viewWeek.classList.contains("active")) {
+                        if (dx < 0) {
+                            returnToHomeScreen(); // Swipe LEFT: Zurück zum Wischschirm
+                        } else {
+                            switchToClockView();  // Swipe RIGHT: Zur Stempeluhr
+                        }
+                    }
+                } else if (dy > 65 && absY > absX * 1.25 && mainDragStartY < 120) {
+                    returnToHomeScreen(); // Pull DOWN am Header: Zurück zum Wischschirm
+                }
+            }
 
             if (appShell) {
                 appShell.addEventListener("touchstart", (e) => {
-                    if (!gesturesEnabled || welcomeOverlay.classList.contains("active") || e.touches.length !== 1) return;
-                    if (e.target.closest("input, select, textarea, button, .modal-overlay, #colorWheel, .nudge-btn, .kw-v-btn")) return;
-                    mainTouchSwiping = true;
-                    mainTouchStartX = e.touches[0].clientX;
-                    mainTouchStartY = e.touches[0].clientY;
+                    if (e.touches.length === 1) {
+                        onAppDragStart(e.touches[0].clientX, e.touches[0].clientY, e.target);
+                    }
                 }, { passive: true });
 
                 appShell.addEventListener("touchend", (e) => {
-                    if (!gesturesEnabled || !mainTouchSwiping || welcomeOverlay.classList.contains("active") || e.changedTouches.length !== 1) return;
-                    mainTouchSwiping = false;
-                    if (e.target.closest("input, select, textarea, button, .modal-overlay, #colorWheel")) return;
-
-                    const dx = e.changedTouches[0].clientX - mainTouchStartX;
-                    const dy = e.changedTouches[0].clientY - mainTouchStartY;
-                    const absX = Math.abs(dx);
-                    const absY = Math.abs(dy);
-
-                    if (absX > 55 && absX > absY * 1.25) {
-                        if (viewClock.classList.contains("active")) {
-                            if (dx > 0) {
-                                // Swipe RIGHT from Clock: Return to Startbildschirm!
-                                returnToHomeScreen();
-                            } else {
-                                // Swipe LEFT from Clock: Go to Week view!
-                                switchToWeekView();
-                            }
-                        } else if (viewWeek.classList.contains("active")) {
-                            if (dx < 0) {
-                                // Swipe LEFT from Week: Return to Startbildschirm!
-                                returnToHomeScreen();
-                            } else {
-                                // Swipe RIGHT from Week: Go to Clock view!
-                                switchToClockView();
-                            }
-                        }
-                    } else if (dy > 70 && absY > absX * 1.3 && mainTouchStartY < 120) {
-                        // Pull DOWN from header area: Return to Startbildschirm!
-                        returnToHomeScreen();
+                    if (mainDragging && e.changedTouches.length === 1) {
+                        onAppDragEnd(e.changedTouches[0].clientX, e.changedTouches[0].clientY);
                     }
                 }, { passive: true });
+
+                appShell.addEventListener("mousedown", (e) => {
+                    if (e.button === 0 && onAppDragStart(e.clientX, e.clientY, e.target)) {
+                        const onUp = (ev) => {
+                            window.removeEventListener("mouseup", onUp);
+                            onAppDragEnd(ev.clientX, ev.clientY);
+                        };
+                        window.addEventListener("mouseup", onUp);
+                    }
+                });
             }
 
             // Live clock update loop
