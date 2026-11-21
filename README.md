@@ -29,7 +29,7 @@ Da Browser Service Worker und PWA-Funktionen aus Sicherheitsgründen nur über `
 
 ```bash
 # Mit Python (standardmäßig auf macOS vorhanden):
-cd /Users/andreas/.gemini/antigravity/scratch/stempeluhr
+cd /Users/andius-g/.gemini/antigravity/scratch/stempeluhr
 python3 -m http.server 8000
 ```
 Anschließend im Browser öffnen: **`http://localhost:8000`**
