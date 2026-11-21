@@ -1,4 +1,4 @@
-const CACHE_NAME = "stempeluhr-v1.21";
+const CACHE_NAME = "stempeluhr-v1.22";
 const ASSETS_TO_CACHE = [
   "./",
   "./index.html",
@@ -13,8 +13,14 @@ const ASSETS_TO_CACHE = [
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => {
-      return cache.addAll(ASSETS_TO_CACHE);
+    caches.open(CACHE_NAME).then(async (cache) => {
+      for (const url of ASSETS_TO_CACHE) {
+        try {
+          await cache.add(url);
+        } catch (err) {
+          console.warn("ServiceWorker caching failed for:", url, err);
+        }
+      }
     }).then(() => self.skipWaiting())
   );
 });
@@ -47,7 +53,6 @@ self.addEventListener("fetch", (event) => {
         }
         return networkResponse;
       }).catch(() => {
-        // Network failed, return cached response if present
         return cachedResponse;
       });
 

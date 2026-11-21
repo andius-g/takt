@@ -836,8 +836,26 @@ document.addEventListener("DOMContentLoaded", () => {
                 welcomeOverlay.style.transform = "";
                 welcomeOverlay.style.opacity = "";
                 welcomeOverlay.classList.remove("active");
-                localStorage.setItem("welcomeDismissedDate", getTodayStr());
                 applyThemeColors(appHue, appLightness);
+            }
+
+            // Click listener for Home button & App Title
+            const btnGoHome = document.getElementById("btn-go-home");
+            const appTitleEl = document.getElementById("app-title");
+            function returnToHomeScreen() {
+                const isRunning = (startHoursInput.value !== "" && endHoursInput.value === "");
+                openWelcomeScreen(welcomeActionMode || (isRunning ? "go" : "come"));
+            }
+            if (btnGoHome) btnGoHome.addEventListener("click", returnToHomeScreen);
+            if (appTitleEl) appTitleEl.addEventListener("click", returnToHomeScreen);
+
+            // Click on Mode Pill on Welcome Screen to toggle mode
+            if (welcomeModePill) {
+                welcomeModePill.style.cursor = "pointer";
+                welcomeModePill.title = "Klicken, um Modus zu wechseln";
+                welcomeModePill.addEventListener("click", () => {
+                    openWelcomeScreen(welcomeActionMode === "come" ? "go" : "come");
+                });
             }
 
             /* 4-RICHTUNGS-GESTEN IM HOME-SCREEN (KOMMEN <-> GEHEN <-> MENÜ <-> WOCHE) */
@@ -2577,30 +2595,52 @@ document.addEventListener("DOMContentLoaded", () => {
                 pdfExportModal.classList.remove("active");
             });
 
-            // Gestures on App Shell
+            // Gestures on App Shell (3-Screen Navigation: Menü <-> Startbildschirm <-> Woche)
             let mainTouchStartX = 0;
             let mainTouchStartY = 0;
+            let mainTouchSwiping = false;
             const appShell = document.querySelector(".app-shell");
 
             if (appShell) {
                 appShell.addEventListener("touchstart", (e) => {
                     if (!gesturesEnabled || welcomeOverlay.classList.contains("active") || e.touches.length !== 1) return;
-                    if (e.target.closest("input, select, textarea, button, .modal-overlay, #colorWheel")) return;
+                    if (e.target.closest("input, select, textarea, button, .modal-overlay, #colorWheel, .nudge-btn, .kw-v-btn")) return;
+                    mainTouchSwiping = true;
                     mainTouchStartX = e.touches[0].clientX;
                     mainTouchStartY = e.touches[0].clientY;
                 }, { passive: true });
 
                 appShell.addEventListener("touchend", (e) => {
-                    if (!gesturesEnabled || welcomeOverlay.classList.contains("active") || e.changedTouches.length !== 1) return;
+                    if (!gesturesEnabled || !mainTouchSwiping || welcomeOverlay.classList.contains("active") || e.changedTouches.length !== 1) return;
+                    mainTouchSwiping = false;
                     if (e.target.closest("input, select, textarea, button, .modal-overlay, #colorWheel")) return;
+
                     const dx = e.changedTouches[0].clientX - mainTouchStartX;
                     const dy = e.changedTouches[0].clientY - mainTouchStartY;
-                    if (Math.abs(dx) > 65 && Math.abs(dx) > Math.abs(dy) * 1.3) {
-                        if (dx < 0 && viewClock.classList.contains("active")) {
-                            switchToWeekView();
-                        } else if (dx > 0 && viewWeek.classList.contains("active")) {
-                            switchToClockView();
+                    const absX = Math.abs(dx);
+                    const absY = Math.abs(dy);
+
+                    if (absX > 55 && absX > absY * 1.25) {
+                        if (viewClock.classList.contains("active")) {
+                            if (dx > 0) {
+                                // Swipe RIGHT from Clock: Return to Startbildschirm!
+                                returnToHomeScreen();
+                            } else {
+                                // Swipe LEFT from Clock: Go to Week view!
+                                switchToWeekView();
+                            }
+                        } else if (viewWeek.classList.contains("active")) {
+                            if (dx < 0) {
+                                // Swipe LEFT from Week: Return to Startbildschirm!
+                                returnToHomeScreen();
+                            } else {
+                                // Swipe RIGHT from Week: Go to Clock view!
+                                switchToClockView();
+                            }
                         }
+                    } else if (dy > 70 && absY > absX * 1.3 && mainTouchStartY < 120) {
+                        // Pull DOWN from header area: Return to Startbildschirm!
+                        returnToHomeScreen();
                     }
                 }, { passive: true });
             }
@@ -2660,10 +2700,7 @@ document.addEventListener("DOMContentLoaded", () => {
                 });
             }
 
-            // Welcome overlay on first open of the day
-            const lastDismissedDate = localStorage.getItem("welcomeDismissedDate");
-            if (lastDismissedDate !== todayStr) {
-                const isRunning = startHoursInput.value !== "" && endHoursInput.value === "";
-                openWelcomeScreen(isRunning ? "go" : "come");
-            }
+            // Always start on the Startbildschirm (Home-Screen mit Scribbles)
+            const isCurrentlyRunning = (startHoursInput.value !== "" && endHoursInput.value === "");
+            openWelcomeScreen(isCurrentlyRunning ? "go" : "come");
         });

@@ -13,7 +13,7 @@
     <link rel="apple-touch-icon" href="favicon.png">
     <link rel="stylesheet" href="style.css">
     <script>
-        const APP_VERSION = "1.21";
+        const APP_VERSION = "1.22";
 
         window.hslToHex = function(h, s, l) {
             h = ((h % 360) + 360) % 360;
@@ -84,7 +84,15 @@
     <!-- HAUPT-APP -->
     <div class="app-shell">
         <header class="top-header">
-            <h1 class="app-title">Stempeluhr</h1>
+            <div style="display: flex; align-items: center; gap: 8px;">
+                <button type="button" class="icon-btn" id="btn-go-home" title="Startbildschirm (Home)">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
+                    </svg>
+                </button>
+                <h1 class="app-title" id="app-title" style="cursor: pointer;" title="Zum Startbildschirm">Stempeluhr</h1>
+            </div>
             <div class="header-actions">
                 <button type="button" class="icon-btn" id="btn-toggle-view" title="Wochenbilanz">
                     <svg id="icon-view-week" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">

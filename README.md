@@ -1,6 +1,6 @@
-# Stempeluhr (PWA)
+# Stempeluhr (PWA) v1.22
 
-Eine moderne, progressive Web-App zur mobilen Arbeitszeiterfassung mit widgetbasiertem Startbildschirm, automatischen Pausenabzügen, Gleitzeit-Ampelkonto (GBV § 5) und PDF-Monatsexport.
+Eine moderne, progressive Web-App zur mobilen Arbeitszeiterfassung mit widgetbasiertem Startbildschirm, animierten Scribbles, automatischen Pausenabzügen, Gleitzeit-Ampelkonto (GBV § 5) und PDF-Monatsexport.
 
 ---
 
@@ -8,75 +8,61 @@ Eine moderne, progressive Web-App zur mobilen Arbeitszeiterfassung mit widgetbas
 
 ```text
 stempeluhr/
-├── index.html                   # Haupt-Einstiegsseite (PWA Shell)
+├── index.html                   # Haupt-Einstiegsseite (PWA Shell) mit Home-Navigation
 ├── style.css                    # Gesamte Stylesheets, Themes & Animationen
-├── app.js                       # Vollständige Applikations- & Berechnungslogik
-├── sw.js                        # Service Worker für Offline-Fähigkeit & Caching
+├── app.js                       # Vollständige Applikations-, Berechnungs- & Navigationslogik
+├── sw.js                        # Service Worker für Offline-Fähigkeit & Caching (v1.22)
 ├── manifest.json                # Web App Manifest für Installation (iOS / Android / Desktop)
 ├── favicon.png                  # App-Icon (64x64)
 ├── icon-192.png                 # PWA-Icon (192x192)
 ├── icon-512.png                 # PWA-Icon (512x512)
-├── stempeluhr.standalone.html   # Einzeldatei-Version (läuft direkt ohne Webserver via file://)
+├── stempeluhr.standalone.html   # Autarke Einzeldatei (läuft direkt via file://)
 └── README.md                    # Dokumentation
 ```
 
 ---
 
+## 🧭 Navigation zwischen den Bildschirmen
+
+Die App besitzt drei Hauptansichten, zwischen denen du sowohl per Button als auch per Wischgeste nahtlos wechseln kannst:
+
+```
+[ Stempeluhr / Menü ]  <═════>  [ Startbildschirm (Home & Scribbles) ]  <═════>  [ Wochenbilanz ]
+```
+
+### 1. Auf dem Startbildschirm (Home & Scribbles):
+* **Wischen nach links (`←`):** Öffnet das **Stempelmenü** (Zeiterfassung / Zeitblöcke).
+* **Wischen nach rechts (`→`):** Öffnet die **Wochenbilanz** (Kalenderwoche).
+* **Wischen nach oben (`↑`):** Schaltet auf Modus **Kommen**.
+* **Wischen nach unten (`↓`):** Schaltet auf Modus **Gehen**.
+* **Klick auf das Widget `Menü →`:** Wechselt direkt ins Menü.
+* **Klick auf das Widget `Stempel-Action`:** Stempelt sofort (Kommen oder Gehen).
+* **Klick auf die Modus-Pille oben:** Schaltet zwischen Kommen und Gehen um.
+
+### 2. In der Haupt-App (Stempelmenü & Wochenbilanz):
+* **Home-Button (`⌂`) im Header:** Bringt dich **jederzeit direkt zurück auf den Startbildschirm** mit deinen Scribbles!
+* **Klick auf den Titel „Stempeluhr“:** Bringt dich ebenfalls direkt zum Startbildschirm.
+* **Wischgeste zurück zum Startbildschirm:**
+  * Im Stempelmenü: **Wischen nach rechts (`→`)** führt zurück zum Startbildschirm.
+  * In der Wochenbilanz: **Wischen nach links (`←`)** führt zurück zum Startbildschirm.
+  * Von ganz oben nach unten ziehen (Pull-Down): Führt ebenfalls zurück zum Startbildschirm.
+* **Wechseln zwischen Menü & Woche:**
+  * Im Header: Klick auf das Kalender-/Uhr-Icon (`btn-toggle-view`).
+  * Per Geste: Im Menü nach links wischen (`←`) bzw. in der Woche nach rechts wischen (`→`).
+
+---
+
 ## 🚀 Starten & Ausführen
 
-### Option A: Über einen lokalen Webserver (Empfohlen für PWA & Service Worker)
-Da Browser Service Worker und PWA-Funktionen aus Sicherheitsgründen nur über `http://` oder `https://` ausführen, empfiehlt sich ein lokaler Webserver:
-
+### Lokaler Webserver (PWA-Betrieb):
 ```bash
-# Mit Python (standardmäßig auf macOS vorhanden):
-cd /Users/andius-g/.gemini/antigravity/scratch/stempeluhr
+cd /Users/andreas/.gemini/antigravity/scratch/stempeluhr
 python3 -m http.server 8000
 ```
 Anschließend im Browser öffnen: **`http://localhost:8000`**
 
-### Option B: Direkt im Browser (Standalone)
-Die Datei `stempeluhr.standalone.html` bündelt HTML, CSS und JavaScript in einer einzigen autarken Datei und kann per Doppelklick direkt im Browser geöffnet werden (auch ohne Webserver).
-
----
-
-## ✨ Funktionsübersicht
-
-1. **Vollbild-Home-Screen mit Widget-Baukasten & Scribbles**
-   - Animierte Doodles/Scribbles (Blitz, Schleife, Stern, Spirale, Wolke, Kaffee, Krone, Herz, etc.) mit Interaktion.
-   - Frei konfigurierbare Widgets (Kommen/Gehen-Action, Live-Uhr, Schnelltippen, Pausen-Rechner, Tagessaldo, Ampelstand, Raucherzähler, Undo).
-   - 4-Richtungs-Wischgesten:
-     - **↑ Wischen:** Modus Kommen
-     - **↓ Wischen:** Modus Gehen
-     - **← Wischen:** Menü / Zeiterfassung
-     - **→ Wischen:** Wochenbilanz
-
-2. **Stempeluhr & Mehrfach-Zeitblöcke**
-   - Einstempeln („Kommen“) und Ausstempeln („Gehen“) mit Sekundengenauigkeit.
-   - Automatische Erkennung und Anzeige mehrerer Zeitblöcke pro Tag (inkl. Unterbrechungs-/Pausenzeiten).
-   - Undo-Funktion (bis zu 20 Schritte rückgängig machen).
-   - Optionaler Raucherpausen-Zähler mit einstellbarer Minuten-Dauer pro Gang.
-
-3. **Gesetzliche Pausen & Push-Vorwarnungen**
-   - Automatische Abzugsberechnung (30 Min ab 6:30 Std, 45 Min ab 9:45 Std Anwesenheit).
-   - Feierabend-Rechner (ohne Pause, 30 Min-Bereich, 45 Min-Grenze).
-   - Push-Benachrichtigung 10 Min vor Erreichen der Pausenschwellen.
-
-4. **Wochenbilanz & Kalenderwochen (KW)**
-   - Übersicht aller Wochentage mit Anzeige von Ist, Soll und Saldo.
-   - KW-Navigation (Vor/Zurück, Sprung zu aktuellem Datum).
-   - Schnelles Nachtragen von Wochenend-Arbeitstagen (Samstag / Sonntag).
-   - Detaillierter Tages-Editor mit Feineinstellung (+/- 1 Min, +/- 5 Min) und Statuswahl (Arbeit, Urlaub, Krank, Feiertag, Frei).
-
-5. **Gleitzeit-Ampelkonto (GBV § 5)**
-   - Farbige Ampel-Status-Pille (Grün, Gelb, Rot) mit verbleibenden Pufferstunden.
-   - Skalierung anhand der vereinbarten Wochenarbeitszeit (z. B. 40h-Basis).
-   - Einstellbarer Startsaldo und Stichtag.
-
-6. **Druckfertiger PDF-Monatsexport (DIN A4)**
-   - Druckfertiger Monats-Stundenzettel mit Monats-Ist, Monats-Soll, Monatssaldo und Unterschriftsfeldern.
-   - Integriertes automatisches JSON-Backup beim PDF-Download.
-
-7. **Design & Farbharmonien**
-   - 120° triadisches Farbrad zur stufenlosen Anpassung aller UI-Farben.
-   - Umschaltbar zwischen **Klassisch** und **Asymmetrisch & Organisch** (mit Intensitätsregler).
-   - Dunkle Menüleiste und automatische Anpassung der Browser-Theme-Farbe.
+### GitHub Pages / Smartphone-Installation:
+1. Den Inhalt des Ordners in dein GitHub-Repository pushen.
+2. In den Repository-Einstellungen unter **Pages** den Branch `main` (Root `/`) auswählen.
+3. Auf dem Smartphone aufrufen und im Browsermenü auf **„Zum Home-Bildschirm hinzufügen“** tippen.
+4. *Hinweis zum PWA-Cache:* Nach einem Update in den Einstellungen der App auf **„↻ Update erzwingen“** tippen, um sofort die neuste Version (v1.22) zu laden.
