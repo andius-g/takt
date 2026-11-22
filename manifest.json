@@ -1,12 +1,14 @@
 {
   "name": "Stempeluhr & Wochenübersicht",
   "short_name": "Stempeluhr",
+  "description": "Mobile Zeiterfassung mit Wochenübersicht, Pausenwächter, GLZ-Ampel und PDF-Export.",
   "start_url": "./index.html",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
-  "background_color": "#eaf4f8",
-  "theme_color": "#eaf4f8",
+  "background_color": "#0d4a5e",
+  "theme_color": "#0d4a5e",
+  "lang": "de",
   "icons": [
     {
       "src": "./favicon_192.png",

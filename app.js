@@ -1,5 +1,5 @@
 /* =========================================================
-   STEMPELUHR & WOCHENÜBERSICHT — ANWENDUNGSLOGIK (VERSION 2.0.0)
+   STEMPELUHR & WOCHENÜBERSICHT — ANWENDUNGSLOGIK (VERSION 2.0.1)
    Architektur: STATE · CALC · STORAGE · UI · EVENTS
    ========================================================= */
 document.addEventListener("DOMContentLoaded", () => {
@@ -97,7 +97,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     /* =========================================================
-       2. STORAGE — 100 % ABWÄRTSKOMPATIBEL ZU v1.x
+       2. STORAGE — 100 % ABWÄRTSKOMPATIBEL ZU v1.x / v2.0.0
        ========================================================= */
     const STORAGE = {
         getDayData(dateStr) {
@@ -280,7 +280,6 @@ document.addEventListener("DOMContentLoaded", () => {
             copy.setDate(copy.getDate() - day + (day === 0 ? -6 : 1));
             return copy;
         },
-        // Gaußsche Osterformel (Gregorianischer Kalender)
         getEasterSunday(year) {
             const a = year % 19;
             const b = Math.floor(year / 100);
@@ -294,7 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
             const k = c % 4;
             const l = (32 + 2 * e + 2 * i - h - k) % 7;
             const m = Math.floor((a + 11 * h + 22 * l) / 451);
-            const month = Math.floor((h + l - 7 * m + 114) / 31); // 3 = März, 4 = April
+            const month = Math.floor((h + l - 7 * m + 114) / 31);
             const day = ((h + l - 7 * m + 114) % 31) + 1;
             return new Date(year, month - 1, day);
         },
@@ -371,14 +370,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
             return { totalPresSecs, totalGapSecs };
         },
-        /**
-         * Gesplittete Tage & gesetzliche Pflichtpause:
-         * - > 6:00 h (21.600 s) Arbeitszeit -> 30 Min (1.800 s) Pflichtpause
-         *   (gleitende Übergangsphase 06:00:00..06:30:00 wenn noch keine reale Pause genommen wurde)
-         * - > 9:00 h (32.400 s) Arbeitszeit -> 45 Min (2.700 s) Pflichtpause
-         * - Bereits ausgestempelte Unterbrechungen (totalGapSecs) werden voll angerechnet:
-         *   Es wird immer nur die noch fehlende Restpause abgezogen, niemals doppelt.
-         */
         getDeductionDetails(totalPresSecs, smokeSecs = 0, totalGapSecs = 0) {
             const gapSecs = Math.max(0, totalGapSecs);
             let missingLegalPauseSecs = 0;
@@ -386,9 +377,7 @@ document.addEventListener("DOMContentLoaded", () => {
             if (totalPresSecs > 32400) {
                 const target45 = 2700;
                 const remaining45 = Math.max(0, target45 - gapSecs);
-                // Gleitender Übergang ab 09:00 h bis 09:00 h + remaining45, damit Netto-Arbeitszeit nicht unter 9:00 h fällt
                 missingLegalPauseSecs = Math.min(remaining45, totalPresSecs - 32400);
-                // Mindestens jedoch der volle 30-Min-Restabzug aus der 6h-Stufe
                 const remaining30 = Math.max(0, 1800 - gapSecs);
                 missingLegalPauseSecs = Math.max(missingLegalPauseSecs, remaining30);
             } else if (totalPresSecs > 21600) {
@@ -633,7 +622,6 @@ document.addEventListener("DOMContentLoaded", () => {
         editorSmokeVal: document.getElementById("editor-smoke-val")
     };
 
-    /* OFFSCREEN-CANVAS FÜR OKLCH-FARBRAD (KEIN 360-SEGMENTE-NEUZEICHNEN BEIM ZIEHEN) */
     const wheelOffscreen = document.createElement("canvas");
     wheelOffscreen.width = DOM.colorWheelCanvas.width;
     wheelOffscreen.height = DOM.colorWheelCanvas.height;
@@ -671,7 +659,6 @@ document.addEventListener("DOMContentLoaded", () => {
             const ctx = DOM.colorWheelCanvas.getContext("2d");
             const radius = DOM.colorWheelCanvas.width / 2;
 
-            // Offscreen-Basis nur neu rendern, wenn sich die Helligkeit geändert hat
             if (cachedWheelLightness !== STATE.appLightness) {
                 const offCtx = wheelOffscreen.getContext("2d");
                 offCtx.clearRect(0, 0, wheelOffscreen.width, wheelOffscreen.height);
@@ -715,7 +702,6 @@ document.addEventListener("DOMContentLoaded", () => {
         syncStampButtonEmphasis() {
             const active = this.isClockedIn();
             if (active) {
-                // Eingestempelt: "Gehen" strahlt voll gesättigt, "Kommen" tritt zurück
                 DOM.btnNowEnd.classList.add("is-primary-active");
                 DOM.btnNowEnd.classList.remove("is-dimmed");
                 DOM.btnNowStart.classList.add("is-dimmed");
@@ -724,7 +710,6 @@ document.addEventListener("DOMContentLoaded", () => {
                 DOM.headerStatusChip.textContent = "Eingestempelt";
                 DOM.headerStatusChip.classList.add("is-running");
             } else {
-                // Ausgestempelt: "Kommen" strahlt voll gesättigt, "Gehen" tritt zurück
                 DOM.btnNowStart.classList.add("is-primary-active");
                 DOM.btnNowStart.classList.remove("is-dimmed");
                 DOM.btnNowEnd.classList.add("is-dimmed");
@@ -743,7 +728,7 @@ document.addEventListener("DOMContentLoaded", () => {
             DOM.btnUndo.disabled = STATE.undoStack.length === 0;
         },
         updateSmokerUI() {
-            DOM.smokerMinsWrap.style.opacity = STATE.isSmokerCheck ? "1" : "0.45";
+            DOM.smokerMinsWrap.style.opacity = DOM.isSmokerCheck.checked ? "1" : "0.45";
             DOM.smokeMinutesInput.disabled = !DOM.isSmokerCheck.checked;
             DOM.smokeBar.style.display = STATE.isSmoker ? "grid" : "none";
             DOM.smokeCountDisplay.textContent = `${STATE.todaySmokeCount}× (-${STATE.todaySmokeCount * STATE.smokeMinutesPerBreak}m)`;
@@ -823,19 +808,14 @@ document.addEventListener("DOMContentLoaded", () => {
             const startTime = new Date();
             startTime.setHours(hours, minutes, seconds, 0);
 
-            // Reale ausgestempelte Pausen (totalGapSecs) verlängern die Rahmenzeit entsprechend,
-            // werden aber auf die 30/45 Min Pflichtpause angerechnet (nur Restpause bleibt zusätzlich).
             const rem30 = Math.max(0, 1800 - totalGapSecs);
             const rem45 = Math.max(0, 2700 - totalGapSecs);
 
             const addWorkPlusGap = (workSecs) => new Date(startTime.getTime() + (workSecs + totalGapSecs) * 1000);
             const formatT = (d) => `${format2(d.getHours())}:${format2(d.getMinutes())}:${format2(d.getSeconds())}`;
 
-            // Ohne Pflichtpausenabzug: bis exakt 06:00:00 Netto-Arbeitszeit
             DOM.outNoPause.textContent = formatT(addWorkPlusGap(6 * 3600));
-            // 30-Min-Stufe: ab 06:00:01 Netto-Arbeitszeit (plus ggf. Restpause) bis 09:00:00 Netto
             DOM.out30Range.textContent = `${formatT(addWorkPlusGap(6 * 3600 + rem30))} bis ${formatT(addWorkPlusGap(9 * 3600 + rem30))}`;
-            // 45-Min-Stufe: ab > 09:00:00 Netto-Arbeitszeit (plus ggf. Restpause)
             DOM.out45Pause.textContent = formatT(addWorkPlusGap(9 * 3600 + rem45));
         },
         calculateWorkingTime() {
@@ -978,8 +958,8 @@ document.addEventListener("DOMContentLoaded", () => {
                 return `${format2(d.getHours())}:${format2(d.getMinutes())}:${format2(d.getSeconds())}`;
             };
 
-            const limit30WorkSecs = 6 * 3600; // 06:00:00 Netto-Arbeitszeit
-            const limit45WorkSecs = 9 * 3600; // 09:00:00 Netto-Arbeitszeit
+            const limit30WorkSecs = 6 * 3600;
+            const limit45WorkSecs = 9 * 3600;
             const gapMins = Math.round(totalGapSecs / 60);
 
             if (totalPresSecs <= limit30WorkSecs) {
@@ -1203,7 +1183,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const todayStr = getTodayStr();
         const leadSecs = STATE.pauseNotifyLeadMins * 60;
 
-        // 30-Min-Pflichtpause nur warnen, wenn noch nicht 30 Min ausgestempelt pausiert wurde
         const limit30Secs = 6 * 3600;
         if (totalGapSecs < 1800 && totalPresSecs >= (limit30Secs - leadSecs) && totalPresSecs < (limit30Secs + 300)) {
             const key30 = `notified_p30_${todayStr}`;
@@ -1222,7 +1201,6 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         }
 
-        // 45-Min-Pflichtpause nur warnen, wenn noch nicht 45 Min ausgestempelt pausiert wurde
         const limit45Secs = 9 * 3600;
         if (totalGapSecs < 2700 && totalPresSecs >= (limit45Secs - leadSecs) && totalPresSecs < (limit45Secs + 300)) {
             const key45 = `notified_p45_${todayStr}`;
@@ -1634,7 +1612,6 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Standard Zahlen / Dezimal (Menü)
         if (/^[0-9]$/.test(action)) {
             if (st.fresh) {
                 st.buffer = action;
@@ -1699,7 +1676,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const realTodayStr = getTodayStr();
         if (STATE.activeDateStr === realTodayStr) return false;
 
-        // Mitternachts-Wechsel erkannt: Vortag sauber abschließen & auf den neuen Tag wechseln
         STORAGE.saveTodaySessionsAndDay(STATE.activeDateStr);
         STATE.undoStack = [];
         UI.updateUndoButtonState();
@@ -1749,7 +1725,6 @@ document.addEventListener("DOMContentLoaded", () => {
     function triggerStampGoNow() {
         ensureCurrentDayActive();
 
-        // Schutz gegen versehentliches "Gehen" ohne vorheriges "Kommen" (kein 00:00-Phantomtag)
         if (STATE.todaySessions.length === 0) {
             DOM.headerStatusChip.textContent = "Erst Kommen stempeln!";
             DOM.btnNowStart.focus();
@@ -1759,7 +1734,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const last = STATE.todaySessions[STATE.todaySessions.length - 1];
         if (last.end !== null && last.end.h !== "") {
-            // Bereits ausgestempelt: bestehende Endzeit nur aktualisieren, wenn der Nutzer es bestätigt
             if (!confirm(`Du bist bereits um ${last.end.h}:${last.end.m} Uhr ausgestempelt. Endzeit auf jetzt aktualisieren?`)) {
                 return;
             }
@@ -1788,7 +1762,6 @@ document.addEventListener("DOMContentLoaded", () => {
             return;
         }
 
-        // Wenn nur "Gehen" ohne "Kommen" eingetragen wird, kein 00:00-Phantomstart erzeugen
         if (!pS && pE && STATE.todaySessions.length === 0) {
             return;
         }
@@ -2072,7 +2045,6 @@ document.addEventListener("DOMContentLoaded", () => {
         openDayEditor(dateStr, `${DAY_FULL_MON[dowIdx]}, ${format2(dt.getDate())}.${format2(dt.getMonth() + 1)}.${dt.getFullYear()}`, "work");
     }
 
-    /* BACKUP-FUNKTIONEN */
     function updateBackupStatusBadge() {
         if (!DOM.backupStatusPill) return;
         const lastIso = localStorage.getItem("lastBackupDate");
@@ -2102,7 +2074,7 @@ document.addEventListener("DOMContentLoaded", () => {
     function exportBackupJson() {
         const payload = {
             app: "Stempeluhr",
-            version: typeof APP_VERSION !== "undefined" ? APP_VERSION : "2.0.0",
+            version: typeof APP_VERSION !== "undefined" ? APP_VERSION : "2.0.1",
             exportedAt: new Date().toISOString(),
             storage: {}
         };
@@ -2325,10 +2297,9 @@ document.addEventListener("DOMContentLoaded", () => {
        11. EVENTS — INTERAKTIONEN, WISCHGESTEN & LIVE-TICK
        ========================================================= */
     if (DOM.versionLabel) {
-        DOM.versionLabel.textContent = `Version ${typeof APP_VERSION !== "undefined" ? APP_VERSION : "2.0.0"}`;
+        DOM.versionLabel.textContent = `Version ${typeof APP_VERSION !== "undefined" ? APP_VERSION : "2.0.1"}`;
     }
 
-    // 3-Sekunden-Notfall-Update auf der Uhrzeit
     if (DOM.liveClockBox) {
         let longPressTimer = null;
         const startHold = () => {
@@ -2346,7 +2317,6 @@ document.addEventListener("DOMContentLoaded", () => {
         DOM.liveClockBox.addEventListener("pointercancel", cancelHold);
     }
 
-    // Untere Daumen-Navigation
     DOM.btnNavToday.addEventListener("click", switchToClockView);
     DOM.btnToggleView.addEventListener("click", () => {
         if (DOM.viewClock.classList.contains("active")) switchToWeekView();
@@ -2354,7 +2324,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     DOM.btnSettings.addEventListener("click", openSettingsMenu);
 
-    // Stempel- & Undo-Buttons
     DOM.btnNowStart.addEventListener("click", triggerStampComeNow);
     DOM.btnNowEnd.addEventListener("click", triggerStampGoNow);
     DOM.btnUndo.addEventListener("click", () => {
@@ -2370,7 +2339,6 @@ document.addEventListener("DOMContentLoaded", () => {
         UI.calculateAllTimes();
     });
 
-    // Startscreen-Buttons
     DOM.btnWelcomeAction.addEventListener("click", () => {
         if (STATE.welcomeActionMode === "go") triggerStampGoNow();
         else triggerStampComeNow();
@@ -2378,7 +2346,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     DOM.btnWelcomeMenu.addEventListener("click", closeWelcomeScreen);
 
-    // Raucherpausen
     document.getElementById("btn-add-smoke").addEventListener("click", () => {
         ensureCurrentDayActive();
         pushUndoSnapshot();
@@ -2398,7 +2365,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // K/G Pillen & Zahlentastatur
     DOM.startTimePill.addEventListener("click", (e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -2467,7 +2433,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     });
 
-    // Wochen-Navigation & KW-Swipebar
     document.getElementById("btn-prev-week").addEventListener("click", (e) => { e.stopPropagation(); changeWeek(-1); });
     document.getElementById("btn-next-week").addEventListener("click", (e) => { e.stopPropagation(); changeWeek(1); });
     document.getElementById("week-kw-badge").addEventListener("click", (e) => { e.stopPropagation(); jumpToCurrentWeek(); });
@@ -2503,7 +2468,6 @@ document.addEventListener("DOMContentLoaded", () => {
         }
     }, true);
 
-    // Nachtragen-Modal
     document.getElementById("btn-open-backfill-modal").addEventListener("click", () => {
         const refDate = new Date();
         refDate.setDate(refDate.getDate() + (STATE.weekOffset * 7));
@@ -2536,7 +2500,6 @@ document.addEventListener("DOMContentLoaded", () => {
         openEditorForAnyDate(chosen);
     });
 
-    // Tages-Editor Events
     document.querySelectorAll("#day-status-chips .day-status-chip").forEach((chip) => {
         chip.addEventListener("click", () => {
             if (!STATE.editingDraft) return;
@@ -2628,7 +2591,6 @@ document.addEventListener("DOMContentLoaded", () => {
         UI.buildWeekView();
     });
 
-    // Menü & Untermenüs
     document.getElementById("btn-open-work-subpage").addEventListener("click", () => showSettingsSubpage("work"));
     document.getElementById("btn-open-widgets-subpage").addEventListener("click", () => showSettingsSubpage("widgets"));
     document.getElementById("btn-open-design-subpage").addEventListener("click", () => showSettingsSubpage("design"));
@@ -2648,7 +2610,6 @@ document.addEventListener("DOMContentLoaded", () => {
         await forceAppReload();
     });
 
-    // Einstellungen Controls
     DOM.pauseWatcherEnabledCheck.addEventListener("change", () => {
         STATE.pauseWatcherEnabled = DOM.pauseWatcherEnabledCheck.checked;
         syncPauseWatcherSettingsUI();
@@ -2700,7 +2661,6 @@ document.addEventListener("DOMContentLoaded", () => {
         DOM.smokeMinutesInput.disabled = !DOM.isSmokerCheck.checked;
     });
 
-    // Scribbles & Icon-Theme
     DOM.btnToggleScribbleAccordion.addEventListener("click", () => {
         STATE.scribbleAccordionOpen = !STATE.scribbleAccordionOpen;
         syncScribbleAccordionUI();
@@ -2720,7 +2680,6 @@ document.addEventListener("DOMContentLoaded", () => {
         });
     });
 
-    // OKLCH Farbrad
     const wheelRadius = DOM.colorWheelCanvas.width / 2;
     DOM.lightnessSlider.addEventListener("input", () => {
         STATE.appLightness = Math.min(52, Math.max(28, parseInt(DOM.lightnessSlider.value, 10)));
@@ -2752,7 +2711,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }, { passive: false });
     window.addEventListener("touchend", () => DOM.colorWheelCanvas.removeEventListener("touchmove", handleColorPick));
 
-    // Backup & Monats-PDF
     document.getElementById("btn-export-backup").addEventListener("click", exportBackupJson);
     document.getElementById("btn-import-backup").addEventListener("click", () => {
         DOM.backupFileInput.value = "";
@@ -2965,7 +2923,6 @@ document.addEventListener("DOMContentLoaded", () => {
         const startX = e.touches[0].clientX;
         const startY = e.touches[0].clientY;
 
-        // 24-px-Rand-Schutzzone gegen Android/iOS System-Zurück-Geste
         if (startX <= EDGE_GUARD_PX || startX >= (window.innerWidth - EDGE_GUARD_PX)) {
             touchBlocked = true;
             return;
@@ -3028,7 +2985,6 @@ document.addEventListener("DOMContentLoaded", () => {
     STORAGE.loadSettingsIntoState();
     STORAGE.loadTodayState(getTodayStr());
 
-    // Formularfelder initial befüllen
     DOM.userNameInput.value = STATE.userName;
     DOM.sollHoursInput.value = STATE.sollHours;
     DOM.sollMinutesInput.value = STATE.sollMinutes;
@@ -3119,7 +3075,6 @@ document.addEventListener("DOMContentLoaded", () => {
         tickLiveEngine();
     });
 
-    /* SUBTILES HAPTIK-FEEDBACK BEI INTERAKTION (6 ms) */
     document.addEventListener("pointerdown", (e) => {
         if (!("vibrate" in navigator)) return;
         const target = e.target.closest("button, .kg-pill, .week-row, .settings-nav-card, .scribble-accordion-btn, .scribble-svg-chip, .day-status-chip, .widget-mode-pill, .icon-variant-card, .kp-key");

@@ -1,752 +1,691 @@
 <!DOCTYPE html>
-<!-- =========================================================
-     STEMPELUHR & WOCHENÜBERSICHT — VERSION 2.0.0
-     ========================================================= -->
-<html lang="de">
+<html lang="de" data-style="classic">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" id="meta-theme-color" content="#eaf4f8">
-    <title>Stempeluhr & Wochenübersicht (v2.0.0)</title>
-
-    <link rel="manifest" id="app-manifest-link" href="./manifest.json">
-    <link rel="icon" id="fav-32" type="image/png" sizes="32x32" href="./favicon_32.png">
-    <link rel="icon" id="fav-192" type="image/png" sizes="192x192" href="./favicon_192.png">
-    <link rel="icon" id="fav-base" href="./favicon.png" type="image/png">
-    <link rel="apple-touch-icon" id="fav-apple" sizes="180x180" href="./favicon_180.png">
-    <link rel="stylesheet" href="./styles.css?v=200">
-
-    <script>
-        const APP_VERSION = "2.0.0";
-
-        window.hslToHex = function(h, s, l) {
-            h = ((h % 360) + 360) % 360;
-            s /= 100; l /= 100;
-            const a = s * Math.min(l, 1 - l);
-            const f = n => {
-                const k = (n + h / 30) % 12;
-                const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-                return Math.round(255 * color).toString(16).padStart(2, '0');
-            };
-            return `#${f(0)}${f(8)}${f(4)}`;
-        };
-
-        window.supportsOklch = (function() {
-            try {
-                return typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("color", "oklch(0.55 0.19 220)");
-            } catch (e) {
-                return false;
-            }
-        })();
-
-        window.computeOklchPalette = function(hue, lightnessPct) {
-            const h = ((Number(hue) || 0) % 360 + 360) % 360;
-            const normL = Math.min(1, Math.max(0, ((Number(lightnessPct) || 44) - 28) / 24));
-            // Kontrast-Korridor für weiße Schrift (#fff) auf satten Vollton-Kacheln (ca. 0.49 .. 0.57)
-            const primaryL = (0.49 + normL * 0.08).toFixed(3);
-            const primaryHoverL = (Math.max(0.42, parseFloat(primaryL) - 0.06)).toFixed(3);
-            const secondaryH = (h + 150) % 360;
-            const secondaryL = primaryL;
-            const secondaryHoverL = primaryHoverL;
-            const chroma = (0.175 + normL * 0.025).toFixed(3);
-
-            const bgHue = (h + 120) % 360;
-            const bgOklch = `oklch(0.955 0.032 ${bgHue})`;
-            const cardOklch = `oklch(0.905 0.048 ${bgHue})`;
-            const subcardOklch = `oklch(0.972 0.024 ${bgHue})`;
-            const textOklch = `oklch(0.27 0.095 ${((h - 125) % 360 + 360) % 360})`;
-            const borderOklch = `oklch(0.76 0.065 ${h})`;
-            const primaryOklch = `oklch(${primaryL} ${chroma} ${h})`;
-            const primaryHoverOklch = `oklch(${primaryHoverL} ${chroma} ${h})`;
-            const secondaryOklch = `oklch(${secondaryL} ${chroma} ${secondaryH})`;
-            const secondaryHoverOklch = `oklch(${secondaryHoverL} ${chroma} ${secondaryH})`;
-
-            const fallbackBgHex = window.hslToHex(bgHue, 52, 93);
-            const fallbackPrimaryHex = window.hslToHex(h, 82, 42);
-            const fallbackSecondaryHex = window.hslToHex(secondaryH, 82, 42);
-
-            return {
-                useOklch: window.supportsOklch,
-                bg: window.supportsOklch ? bgOklch : fallbackBgHex,
-                cardBg: window.supportsOklch ? cardOklch : window.hslToHex(bgHue, 46, 87),
-                subcardBg: window.supportsOklch ? subcardOklch : window.hslToHex(bgHue, 48, 95),
-                text: window.supportsOklch ? textOklch : window.hslToHex(h - 125, 65, 22),
-                border: window.supportsOklch ? borderOklch : window.hslToHex(h, 35, 74),
-                primary: window.supportsOklch ? primaryOklch : fallbackPrimaryHex,
-                primaryHover: window.supportsOklch ? primaryHoverOklch : window.hslToHex(h, 86, 36),
-                secondary: window.supportsOklch ? secondaryOklch : fallbackSecondaryHex,
-                secondaryHover: window.supportsOklch ? secondaryHoverOklch : window.hslToHex(secondaryH, 86, 36),
-                metaBg: fallbackBgHex,
-                metaWelcome: window.hslToHex(h, 55, 20),
-                primaryL: parseFloat(primaryL),
-                chroma: parseFloat(chroma)
-            };
-        };
-
-        window.applyAppIconTheme = function(theme) {
-            const isRose = theme === "rose";
-            const manifestEl = document.getElementById("app-manifest-link");
-            const fav32 = document.getElementById("fav-32");
-            const fav192 = document.getElementById("fav-192");
-            const favBase = document.getElementById("fav-base");
-            const favApple = document.getElementById("fav-apple");
-
-            if (manifestEl) manifestEl.setAttribute("href", isRose ? "./manifest-rose.json" : "./manifest.json");
-            if (fav32) fav32.setAttribute("href", isRose ? "./favicon_rose_32.png" : "./favicon_32.png");
-            if (fav192) fav192.setAttribute("href", isRose ? "./favicon_rose_192.png" : "./favicon_192.png");
-            if (favBase) favBase.setAttribute("href", isRose ? "./favicon_rose_192.png" : "./favicon.png");
-            if (favApple) favApple.setAttribute("href", isRose ? "./favicon_rose_180.png" : "./favicon_180.png");
-        };
-
-        (function() {
-            const h = parseInt(localStorage.getItem("appHue"), 10);
-            const l = parseInt(localStorage.getItem("appLightness"), 10);
-            const hue = isNaN(h) ? 195 : h;
-            const light = isNaN(l) ? 44 : Math.min(52, Math.max(28, l));
-
-            const styleMode = localStorage.getItem("appStyleMode") === "asymmetric" ? "asymmetric" : "classic";
-            const rawIntensity = parseInt(localStorage.getItem("appAsymIntensity"), 10);
-            const intensity = isNaN(rawIntensity) ? 55 : Math.min(100, Math.max(0, rawIntensity));
-
-            const pal = window.computeOklchPalette(hue, light);
-            const root = document.documentElement;
-            root.setAttribute("data-style", styleMode);
-            root.style.setProperty("--hue", hue);
-            root.style.setProperty("--lightness", light + "%");
-            root.style.setProperty("--asym-intensity", (intensity / 100).toFixed(3));
-            root.style.setProperty("--bg-color", pal.bg);
-            root.style.setProperty("--card-bg", pal.cardBg);
-            root.style.setProperty("--subcard-bg", pal.subcardBg);
-            root.style.setProperty("--text-color", pal.text);
-            root.style.setProperty("--border-color", pal.border);
-            root.style.setProperty("--primary-color", pal.primary);
-            root.style.setProperty("--primary-hover", pal.primaryHover);
-            root.style.setProperty("--secondary-color", pal.secondary);
-            root.style.setProperty("--secondary-hover", pal.secondaryHover);
-            root.style.backgroundColor = pal.bg;
-
-            const meta = document.getElementById("meta-theme-color");
-            if (meta) meta.setAttribute("content", pal.metaBg);
-
-            const savedIconTheme = localStorage.getItem("appIconTheme") === "rose" ? "rose" : "blue";
-            window.applyAppIconTheme(savedIconTheme);
-        })();
-    </script>
-
-    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" id="meta-theme-color" content="#0d4a5e">
     <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Stempeluhr">
+    <title>Stempeluhr & Wochenübersicht</title>
 
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-    <script src="./app.js?v=200" defer></script>
+    <link rel="manifest" id="app-manifest-link" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="192x192" id="app-favicon-192" href="./favicon_192.png">
+    <link rel="icon" type="image/png" sizes="512x512" id="app-favicon-512" href="./favicon_512.png">
+    <link rel="apple-touch-icon" id="app-apple-touch-icon" href="./favicon_192.png">
+
+    <link rel="stylesheet" href="./styles.css">
+
+    <!-- Früh-Initialisierung für Version, Theme-Palette (OKLCH + HSL-Fallback) & Icon-Manifest -->
+    <script>
+        window.APP_VERSION = "2.0.1";
+
+        window.computeOklchPalette = function (hue, lightness) {
+            const h = ((Number(hue) || 195) % 360 + 360) % 360;
+            const l = Math.min(52, Math.max(28, Number(lightness) || 44));
+            const supportsOklch = typeof CSS !== "undefined" && CSS.supports && CSS.supports("color", "oklch(50% 0.1 200)");
+
+            const secH = (h + 145) % 360;
+            const bgL = Math.max(16, l - 22);
+            const cardL = Math.max(21, l - 15);
+            const subL = Math.max(26, l - 10);
+            const borderL = Math.min(68, l + 10);
+            const hoverL = Math.min(64, l + 6);
+            const secL = Math.min(54, Math.max(36, l + 2));
+            const secHoverL = Math.min(62, secL + 6);
+
+            // HSL-Annäherung als universeller Fallback & für <meta name="theme-color">
+            const hslHex = (hh, ss, ll) => {
+                const s = ss / 100;
+                const lNorm = ll / 100;
+                const a = s * Math.min(lNorm, 1 - lNorm);
+                const f = (n) => {
+                    const k = (n + hh / 30) % 12;
+                    const c = lNorm - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+                    return Math.round(255 * c).toString(16).padStart(2, "0");
+                };
+                return `#${f(0)}${f(8)}${f(4)}`;
+            };
+
+            const metaBgHex = hslHex(h, 58, Math.max(15, bgL - 2));
+            const metaWelcomeHex = hslHex(h, 64, Math.max(20, l - 12));
+
+            if (!supportsOklch) {
+                return {
+                    bg: hslHex(h, 54, bgL),
+                    cardBg: hslHex(h, 50, cardL),
+                    subcardBg: hslHex(h, 46, subL),
+                    text: "#ffffff",
+                    border: hslHex(h, 42, borderL),
+                    primary: hslHex(h, 76, l),
+                    primaryHover: hslHex(h, 78, hoverL),
+                    secondary: hslHex(secH, 68, secL),
+                    secondaryHover: hslHex(secH, 72, secHoverL),
+                    metaBg: metaBgHex,
+                    metaWelcome: metaWelcomeHex
+                };
+            }
+
+            return {
+                bg: `oklch(${bgL}% 0.065 ${h})`,
+                cardBg: `oklch(${cardL}% 0.075 ${h})`,
+                subcardBg: `oklch(${subL}% 0.085 ${h})`,
+                text: "#ffffff",
+                border: `oklch(${borderL}% 0.095 ${h} / 0.34)`,
+                primary: `oklch(${l}% 0.165 ${h})`,
+                primaryHover: `oklch(${hoverL}% 0.175 ${h})`,
+                secondary: `oklch(${secL}% 0.155 ${secH})`,
+                secondaryHover: `oklch(${secHoverL}% 0.165 ${secH})`,
+                metaBg: metaBgHex,
+                metaWelcome: metaWelcomeHex
+            };
+        };
+
+        window.applyAppIconTheme = function (theme) {
+            const isRose = theme === "rose";
+            const manifestHref = isRose ? "./manifest-rose.json" : "./manifest.json";
+            const icon192 = isRose ? "./favicon_rose_192.png" : "./favicon_192.png";
+            const icon512 = isRose ? "./favicon_rose_512.png" : "./favicon_512.png";
+
+            const mLink = document.getElementById("app-manifest-link");
+            const f192 = document.getElementById("app-favicon-192");
+            const f512 = document.getElementById("app-favicon-512");
+            const apple = document.getElementById("app-apple-touch-icon");
+
+            if (mLink) mLink.setAttribute("href", manifestHref);
+            if (f192) f192.setAttribute("href", icon192);
+            if (f512) f512.setAttribute("href", icon512);
+            if (apple) apple.setAttribute("href", icon192);
+        };
+
+        (function initEarlyTheme() {
+            try {
+                const savedTheme = localStorage.getItem("appIconTheme") === "rose" ? "rose" : "blue";
+                window.applyAppIconTheme(savedTheme);
+                const h = parseInt(localStorage.getItem("appHue"), 10);
+                const l = parseInt(localStorage.getItem("appLightness"), 10);
+                const pal = window.computeOklchPalette(isNaN(h) ? 195 : h, isNaN(l) ? 44 : l);
+                document.documentElement.style.backgroundColor = pal.bg;
+                const meta = document.getElementById("meta-theme-color");
+                if (meta) meta.setAttribute("content", pal.metaBg);
+            } catch (e) {}
+        })();
+    </script>
 </head>
 <body>
-    <div class="edge-bg-layer" id="edge-bg-layer"></div>
+    <!-- Hintergrund-Layer & Stunden-Wasserzeichen -->
+    <div id="edge-bg-layer" aria-hidden="true"></div>
+    <div id="bg-hour-watermark" aria-hidden="true">08</div>
 
-    <!-- SCREEN 1: START (KOMMEN / GEHEN) + SCRIBBLES + PAUSENWÄCHTER -->
-    <section class="welcome-overlay" id="welcome-overlay" aria-label="Start">
-        <div class="welcome-scatter-field" id="welcome-scatter-field"></div>
+    <!-- =========================================================
+         START-OVERLAY (KOMMEN / GEHEN, SCRIBBLES & PAUSENWÄCHTER)
+         ========================================================= -->
+    <section id="welcome-overlay" aria-label="Schnellstart">
+        <div id="welcome-scatter-field" aria-hidden="true"></div>
 
-        <div class="welcome-top-area">
-            <div class="welcome-date-sub" id="welcome-date-sub">-</div>
-            <h1 class="welcome-greeting" id="welcome-greeting">Guten Morgen!</h1>
-        </div>
+        <div class="welcome-inner">
+            <header class="welcome-top">
+                <p id="welcome-date-sub" class="welcome-date">Sonntag, 22.11.2026</p>
+                <h1 id="welcome-greeting" class="welcome-greeting">Guten Tag!</h1>
+                <div id="welcome-big-clock" class="welcome-clock">08:00:00</div>
+            </header>
 
-        <div class="welcome-actions-stack" id="welcome-actions-stack">
-            <!-- PAUSENWÄCHTER-WIDGET -->
-            <div class="welcome-pause-widget" id="welcome-pause-widget" style="display: none;" aria-live="polite">
+            <!-- Pausenwächter-Widget -->
+            <div id="welcome-pause-widget" class="welcome-pause-widget" style="display: none;">
                 <div class="wpw-top-row">
-                    <span class="wpw-badge" id="wpw-badge">30-Min-Grenze</span>
-                    <span class="wpw-limit-time" id="wpw-limit-time">bis --:--:--</span>
+                    <span id="wpw-badge" class="wpw-badge">30-Min-Grenze</span>
+                    <span id="wpw-limit-time" class="wpw-limit">bis 14:00:00</span>
                 </div>
-                <div class="wpw-countdown" id="wpw-countdown">00:00:00</div>
-                <div class="wpw-sub-status" id="wpw-sub-status"></div>
+                <div id="wpw-countdown" class="wpw-countdown">01:24:10</div>
+                <div id="wpw-sub-status" class="wpw-sub"></div>
             </div>
 
-            <button type="button" class="btn-welcome-action" id="btn-welcome-action">
-                <strong id="welcome-action-title">Kommen</strong>
-                <span id="welcome-action-sub">Jetzt direkt einstempeln</span>
-            </button>
-
-            <button type="button" class="btn-welcome-menu" id="btn-welcome-menu">
-                <div class="welcome-big-clock" id="welcome-big-clock">--:--:--</div>
-                <div class="welcome-menu-hint">Zur Uhr →</div>
-            </button>
-
-            <div class="nav-compass-hint" id="welcome-compass-hint">
-                <span>← Woche</span>
-                <span id="welcome-vertical-hint">↕ Kommen / Gehen</span>
-                <span>Uhr →</span>
+            <div class="welcome-bottom-actions">
+                <button type="button" id="btn-welcome-action" class="welcome-cta-btn">
+                    <span id="welcome-action-title" class="welcome-cta-title">Kommen</span>
+                    <span id="welcome-action-sub" class="welcome-cta-sub">Jetzt direkt einstempeln</span>
+                </button>
+                <button type="button" id="btn-welcome-menu" class="welcome-skip-btn">
+                    Direkt zur Übersicht
+                </button>
             </div>
         </div>
     </section>
 
-    <!-- HAUPT-APP (SCREEN 2 UHR & SCREEN 3 WOCHE) MIT DAUMENZONE UNTEN -->
-    <div class="container" id="app-container">
-        <header class="top-header-card">
-            <div class="live-clock-box" id="live-clock-box" title="3 Sek. halten für Notfall-Update">
-                <div class="live-time" id="live-clock-time">--:--:--</div>
-                <div class="live-weekday" id="live-clock-day">-</div>
+    <!-- =========================================================
+         HAUPT-APP-SHELL (100dvh · DAUMENZONE UNTEN)
+         ========================================================= -->
+    <div class="app-shell">
+        <!-- Kompakte Kopfzeile mit Live-Uhr (3s Halten = Notfall-Update) -->
+        <header class="app-header">
+            <div id="live-clock-box" class="live-clock-box" title="3 Sekunden gedrückt halten für Notfall-Update">
+                <div id="live-clock-time" class="live-clock-time">08:00:00</div>
+                <div id="live-clock-day" class="live-clock-day">Sonntag, 22.11.2026</div>
             </div>
-            <div class="header-status-chip" id="header-status-chip">Bereit</div>
+            <div id="header-status-chip" class="header-status-chip">Bereit</div>
         </header>
 
-        <div class="views-stage" id="views-stage">
-            <!-- SCREEN 2: UHR -->
-            <div id="view-clock" class="view-section active">
-                <div class="feature-section clock-layout-card">
-                    <div class="bg-hour-watermark" id="bg-hour-watermark">--</div>
-
-                    <div class="output-container">
-                        <div class="output">
-                            <h3>Keine Pause (gehen um):</h3>
-                            <div id="output-no-pause">-</div>
-                        </div>
-                        <div class="output">
-                            <h3>30 min Pause (von - bis):</h3>
-                            <div id="output-30min-pause-range">-</div>
-                        </div>
-                        <div class="output">
-                            <h3>45 min Pause (ab):</h3>
-                            <div id="output-45min-pause">-</div>
-                        </div>
+        <!-- Scrollbare Ansichts-Bühne -->
+        <main id="views-stage" class="views-stage">
+            <!-- =====================================================
+                 ANSICHT 1: HEUTE / STEMPELUHR
+                 ===================================================== -->
+            <section id="view-clock" class="app-view active" aria-label="Heutige Zeiterfassung">
+                <!-- Pausen- & Feierabend-Korridore -->
+                <div class="card-solid corridor-card">
+                    <div class="corridor-row">
+                        <span class="corridor-lbl">Ohne Abzug (6:00 h)</span>
+                        <strong id="output-no-pause" class="corridor-val">-</strong>
                     </div>
-
-                    <div class="output-decimal-container">
-                        <div class="output-decimal">
-                            <h3 id="label-decimal-time">Dezimal (h)</h3>
-                            <div id="output-decimal-time">-</div>
-                            <div class="output-sub-hint" id="output-pause-hint" style="display:none;"></div>
-                        </div>
-                        <div class="output-decimal">
-                            <h3 id="label-overtime">+/-</h3>
-                            <div id="output-overtime">-</div>
-                        </div>
+                    <div class="corridor-row">
+                        <span class="corridor-lbl">30 Min Pause (6–9 h)</span>
+                        <strong id="output-30min-pause-range" class="corridor-val">-</strong>
                     </div>
-
-                    <div class="sessions-box" id="sessions-box" style="display: none;">
-                        <div class="sessions-header">
-                            <span>Stempel-Blöcke heute</span>
-                            <span id="sessions-pres-sum">00:00 h</span>
-                        </div>
-                        <div id="sessions-list"></div>
-                        <div class="sessions-break-info" id="sessions-break-info" style="display: none;">
-                            <span>Unterbrechung (abwesend):</span>
-                            <strong id="sessions-gap-sum">0 min</strong>
-                        </div>
-                    </div>
-
-                    <div class="thumb-action-cluster">
-                        <div class="time-input-pair" id="smoke-bar" style="display: none;">
-                            <button type="button" class="btn-now" id="btn-add-smoke">🚬 Raucherpause</button>
-                            <div class="smoke-counter-box">
-                                <span id="smoke-count-display">0× (-0m)</span>
-                                <button type="button" class="btn-smoke-minus" id="btn-sub-smoke" title="Eine Pause abziehen">−</button>
-                            </div>
-                        </div>
-
-                        <div class="dual-manual-pills">
-                            <div class="kg-pill" id="pill-start">
-                                <div class="kg-pill-tag">K</div>
-                                <input type="text" id="startTimePill" class="kg-pill-input keypad-bound-input" value="" inputmode="none" autocomplete="off" autocorrect="off" spellcheck="false" readonly placeholder="hh:mm" aria-label="Kommen hh:mm">
-                            </div>
-                            <div class="kg-pill" id="pill-end">
-                                <div class="kg-pill-tag">G</div>
-                                <input type="text" id="endTimePill" class="kg-pill-input keypad-bound-input" value="" inputmode="none" autocomplete="off" autocorrect="off" spellcheck="false" readonly placeholder="hh:mm" aria-label="Gehen hh:mm">
-                            </div>
-                        </div>
-
-                        <div class="stamp-btn-row">
-                            <button type="button" class="btn-stamp is-primary-active" id="btn-now-start">Kommen</button>
-                            <button type="button" class="btn-stamp is-secondary-active" id="btn-now-end">Gehen</button>
-                            <button type="button" class="btn-undo" id="btn-undo" title="Letzte Eingabe rückgängig" aria-label="Rückgängig" disabled>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
-                                    <path d="M9 14L4 9l5-5"></path>
-                                    <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
-                                </svg>
-                            </button>
-                        </div>
+                    <div class="corridor-row">
+                        <span class="corridor-lbl">45 Min Pause (&gt; 9:00 h)</span>
+                        <strong id="output-45min-pause" class="corridor-val">-</strong>
                     </div>
                 </div>
-            </div>
 
-            <!-- SCREEN 3: WOCHE -->
-            <div id="view-week" class="view-section">
-                <div class="feature-section" id="week-feature-card">
-                    <div class="week-window-card">
-                        <div id="week-days-container"></div>
-                        <button type="button" class="btn-add-day-entry" id="btn-open-backfill-modal">
-                            <span>+ Tag / Wochenende nachtragen</span>
+                <!-- Netto-Kennzahlen: Dezimal / Bisher & +/- Soll -->
+                <div class="kpi-grid-2">
+                    <div class="card-solid kpi-tile">
+                        <span id="label-decimal-time" class="kpi-lbl">Dezimal (h)</span>
+                        <strong id="output-decimal-time" class="kpi-val">-</strong>
+                        <span id="output-pause-hint" class="kpi-sub-hint" style="display: none;"></span>
+                    </div>
+                    <div class="card-solid kpi-tile">
+                        <span id="label-overtime" class="kpi-lbl">+/-</span>
+                        <strong id="output-overtime" class="kpi-val">-</strong>
+                    </div>
+                </div>
+
+                <!-- Stempel-Steuerung (Ergonomisch in der Daumenzone) -->
+                <div class="card-solid stamp-control-card">
+                    <div class="stamp-primary-row">
+                        <button type="button" id="btn-now-start" class="stamp-btn btn-come is-primary-active">
+                            <span class="stamp-btn-main">Kommen</span>
+                            <span class="stamp-btn-sub">Einstempeln</span>
+                        </button>
+                        <button type="button" id="btn-now-end" class="stamp-btn btn-go is-dimmed">
+                            <span class="stamp-btn-main">Gehen</span>
+                            <span class="stamp-btn-sub">Ausstempeln</span>
+                        </button>
+                        <button type="button" id="btn-undo" class="undo-icon-btn" title="Letzte Aktion rückgängig" aria-label="Rückgängig" disabled>
+                            ↶
                         </button>
                     </div>
 
-                    <div class="week-switcher-row">
-                        <div class="kw-merged-swipebar" id="kw-merged-swipebar">
-                            <button type="button" class="kw-edge-zone" id="btn-prev-week" title="Vorherige KW">‹ Vorherige</button>
-                            <button type="button" class="kw-center-zone" id="week-kw-badge" title="Tippen für aktuelle KW">
-                                <span class="kw-center-title" id="week-kw-main">KW -</span>
-                            </button>
-                            <button type="button" class="kw-edge-zone" id="btn-next-week" title="Nächste KW">Nächste ›</button>
+                    <!-- Zwei K/G-Pillen (hh:mm) unter den Stempel-Buttons -->
+                    <div class="kg-pills-row">
+                        <div id="pill-start" class="kg-pill">
+                            <span class="kg-badge">K</span>
+                            <input type="text" id="startTimePill" inputmode="none" readonly placeholder="--:--" aria-label="Kommen Uhrzeit">
                         </div>
-                        <div class="date-jump-wrap" title="Zu Datum springen">
-                            <div class="btn-date-jump">
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                                </svg>
-                            </div>
-                            <input type="date" class="hidden-date-picker" id="week-date-picker" aria-label="Datum auswählen">
+                        <div id="pill-end" class="kg-pill">
+                            <span class="kg-badge">G</span>
+                            <input type="text" id="endTimePill" inputmode="none" readonly placeholder="--:--" aria-label="Gehen Uhrzeit">
                         </div>
                     </div>
 
-                    <div class="output-decimal-container week-summary-pair">
-                        <div class="output-decimal">
-                            <h3 id="label-week-worked">Geleistet (Ist)</h3>
-                            <div id="output-week-worked">-</div>
-                        </div>
-                        <div class="output-decimal">
-                            <h3 id="label-week-total">Wochen-Saldo</h3>
-                            <div id="output-week-total">-</div>
-                        </div>
-                    </div>
-
-                    <div class="glz-pill-wrap">
-                        <div id="glzPill" class="glz-pill ampel-gruen">
-                            <span class="glz-dot"></span>
-                            <span id="glzPillText">GLZ: +0,00h (Grün · noch 40,0h bis Gelb)</span>
+                    <!-- Optionale Raucherpausen-Leiste -->
+                    <div id="smoke-bar" class="smoke-bar" style="display: none;">
+                        <span class="smoke-label">🚬 Raucherpause</span>
+                        <div class="smoke-controls">
+                            <button type="button" id="btn-sub-smoke" class="smoke-step-btn" aria-label="Raucherpause minus">−</button>
+                            <span id="smoke-count-display" class="smoke-count">0× (-0m)</span>
+                            <button type="button" id="btn-add-smoke" class="smoke-step-btn" aria-label="Raucherpause plus">+</button>
                         </div>
                     </div>
                 </div>
-            </div>
-        </div>
 
-        <!-- UNTERE DAUMENZONE-NAVIGATION -->
-        <nav class="bottom-thumb-nav" id="bottom-thumb-nav" aria-label="Hauptnavigation">
-            <button type="button" class="thumb-nav-btn is-current" id="btn-nav-today" aria-label="Heute / Uhr">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                    <circle cx="12" cy="12" r="9"></circle>
-                    <polyline points="12 7 12 12 15 14"></polyline>
-                </svg>
-                <span>Uhr</span>
+                <!-- Mehrfach-Stempelblöcke (erscheint automatisch ab 2 Blöcken) -->
+                <div id="sessions-box" class="card-solid sessions-card" style="display: none;">
+                    <div class="sessions-head">
+                        <span>Stempelblöcke heute</span>
+                        <strong id="sessions-pres-sum">Anwesenheit: 00:00 h</strong>
+                    </div>
+                    <div id="sessions-list" class="sessions-list"></div>
+                    <div id="sessions-break-info" class="sessions-break-info" style="display: none;">
+                        <span>Ausgestempelte Pause:</span>
+                        <strong id="sessions-gap-sum">0 min</strong>
+                    </div>
+                </div>
+            </section>
+
+            <!-- =====================================================
+                 ANSICHT 2: WOCHENÜBERSICHT & GBV-§-5-GLZ-AMPEL
+                 ===================================================== -->
+            <section id="view-week" class="app-view" aria-label="Wochenübersicht">
+                <!-- KW-Navigations- & Wischleiste -->
+                <div id="kw-merged-swipebar" class="card-solid kw-swipebar">
+                    <button type="button" id="btn-prev-week" class="kw-arrow-btn" aria-label="Vorherige Woche">‹</button>
+                    <div id="week-kw-badge" class="kw-center-box" title="Tippen für aktuelle Woche">
+                        <strong id="week-kw-main">KW 47 · 2026</strong>
+                        <span class="kw-hint">Tippen = Heute · Wischen = ±1 KW</span>
+                    </div>
+                    <label class="kw-cal-btn" title="Zu Datum springen" aria-label="Datum auswählen">
+                        📅
+                        <input type="date" id="week-date-picker">
+                    </label>
+                    <button type="button" id="btn-next-week" class="kw-arrow-btn" aria-label="Nächste Woche">›</button>
+                </div>
+
+                <!-- GBV § 5 GLZ-Ampelkonto -->
+                <div id="glzPill" class="glz-ampel-pill ampel-gruen">
+                    <span class="glz-dot"></span>
+                    <span id="glzPillText">GLZ: +0,00h (Grün)</span>
+                </div>
+
+                <!-- Wochen-Summenkacheln -->
+                <div class="kpi-grid-2">
+                    <div class="card-solid kpi-tile">
+                        <span id="label-week-worked" class="kpi-lbl">Geleistet (Ist)</span>
+                        <strong id="output-week-worked" class="kpi-val">00:00 h</strong>
+                    </div>
+                    <div class="card-solid kpi-tile">
+                        <span id="label-week-total" class="kpi-lbl">Wochen-Saldo</span>
+                        <strong id="output-week-total" class="kpi-val">+00:00 h</strong>
+                    </div>
+                </div>
+
+                <!-- Wochentage Mo–Sa (+ So falls gebucht) -->
+                <div id="week-days-container" class="week-days-list"></div>
+
+                <!-- Wochen-Aktionen: Tag nachtragen & Monats-PDF -->
+                <div class="week-actions-row">
+                    <button type="button" id="btn-open-backfill-modal" class="secondary-action-btn">
+                        + Tag nachtragen
+                    </button>
+                    <button type="button" id="btn-open-pdf-modal" class="primary-action-btn">
+                        📄 Monats-PDF
+                    </button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Untere Daumen-Navigation -->
+        <nav class="bottom-nav" aria-label="Hauptnavigation">
+            <button type="button" id="btn-nav-today" class="bottom-nav-btn is-current">
+                <span class="nav-ico">⏱</span>
+                <span class="nav-txt">Heute</span>
             </button>
-            <button type="button" class="thumb-nav-btn" id="btn-toggle-view" aria-label="Woche">
-                <svg id="icon-view-week" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                    <line x1="18" y1="20" x2="18" y2="10"></line>
-                    <line x1="12" y1="20" x2="12" y2="4"></line>
-                    <line x1="6" y1="20" x2="6" y2="14"></line>
-                </svg>
-                <svg id="icon-view-clock" style="display:none;" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                    <line x1="16" y1="2" x2="16" y2="6"></line>
-                    <line x1="8" y1="2" x2="8" y2="6"></line>
-                    <line x1="3" y1="10" x2="21" y2="10"></line>
-                </svg>
-                <span id="label-nav-week">Woche</span>
+            <button type="button" id="btn-toggle-view" class="bottom-nav-btn">
+                <span class="nav-ico">📅</span>
+                <span class="nav-txt">Woche</span>
             </button>
-            <button type="button" class="thumb-nav-btn" id="btn-settings" aria-label="Menü">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
-                    <line x1="4" y1="6" x2="20" y2="6"></line>
-                    <line x1="4" y1="12" x2="20" y2="12"></line>
-                    <line x1="4" y1="18" x2="20" y2="18"></line>
-                </svg>
-                <span>Menü</span>
+            <button type="button" id="btn-settings" class="bottom-nav-btn">
+                <span class="nav-ico">⚙</span>
+                <span class="nav-txt">Menü</span>
             </button>
         </nav>
     </div>
 
-    <!-- GLOBALE ZAHLENTASTATUR (4 TASTEN IN REIHE 4: ,  0  .  ↵) -->
-    <div class="custom-keypad-sheet" id="custom-keypad-sheet" role="region" aria-label="Zahlentastatur">
+    <!-- =========================================================
+         EIGENE 4-REIHEN-ZAHLENTASTATUR
+         ========================================================= -->
+    <div id="custom-keypad-sheet" class="keypad-sheet" aria-label="Zahlentastatur">
         <div class="keypad-topbar">
-            <span class="keypad-target-badge" id="keypad-target-badge">Kommen (hh:mm)</span>
-            <button type="button" class="keypad-close-btn" id="keypad-close-btn">Fertig</button>
+            <span id="keypad-target-badge" class="keypad-badge">Eingabe</span>
+            <button type="button" id="keypad-close-btn" class="keypad-done-btn">Fertig ✓</button>
         </div>
         <div class="keypad-grid">
+            <!-- Reihe 1 -->
             <button type="button" class="kp-key" data-kp="1">1</button>
             <button type="button" class="kp-key" data-kp="2">2</button>
             <button type="button" class="kp-key" data-kp="3">3</button>
-            <button type="button" class="kp-key kp-op" data-kp="-" title="Minus">−</button>
-
+            <button type="button" class="kp-key kp-fn" data-kp="del" aria-label="Löschen">⌫</button>
+            <!-- Reihe 2 -->
             <button type="button" class="kp-key" data-kp="4">4</button>
             <button type="button" class="kp-key" data-kp="5">5</button>
             <button type="button" class="kp-key" data-kp="6">6</button>
-            <button type="button" class="kp-key kp-op" data-kp="+" title="Plus">+</button>
-
+            <button type="button" class="kp-key kp-fn" data-kp="-">−</button>
+            <!-- Reihe 3 -->
             <button type="button" class="kp-key" data-kp="7">7</button>
             <button type="button" class="kp-key" data-kp="8">8</button>
             <button type="button" class="kp-key" data-kp="9">9</button>
-            <button type="button" class="kp-key kp-del" data-kp="del" title="Löschen" aria-label="Löschen">⌫</button>
-
-            <button type="button" class="kp-key kp-op" data-kp="," title="Komma">,</button>
-            <button type="button" class="kp-key" data-kp="0" title="Null">0</button>
-            <button type="button" class="kp-key kp-op" data-kp="." title="Punkt">.</button>
-            <button type="button" class="kp-key kp-enter" data-kp="enter" title="Enter" aria-label="Enter">↵</button>
+            <button type="button" class="kp-key kp-fn" data-kp="+">+</button>
+            <!-- Reihe 4 -->
+            <button type="button" class="kp-key kp-fn" data-kp=",">,</button>
+            <button type="button" class="kp-key" data-kp="0">0</button>
+            <button type="button" class="kp-key kp-fn" data-kp=".">.</button>
+            <button type="button" class="kp-key kp-enter" data-kp="enter" aria-label="Weiter / Übernehmen">↵</button>
         </div>
     </div>
 
-    <!-- MODAL: TAG NACHTRAGEN -->
-    <div class="modal-overlay" id="backfill-modal">
-        <div class="modal-content">
-            <button type="button" class="close-btn" id="btn-close-backfill-modal">&times;</button>
-            <h2>Tag nachtragen</h2>
-            <div class="settings-group">
-                <label>Wochenende der angezeigten KW:</label>
-                <div class="weekend-quick-grid">
-                    <button type="button" class="btn-weekend-quick" id="btn-quick-sat">Samstag<br><span id="quick-sat-date" style="font-weight:normal; font-size:0.86em;">--.--.</span></button>
-                    <button type="button" class="btn-weekend-quick" id="btn-quick-sun">Sonntag<br><span id="quick-sun-date" style="font-weight:normal; font-size:0.86em;">--.--.</span></button>
-                </div>
-            </div>
-            <div class="settings-group">
-                <label for="backfillDateInput">Oder beliebiges Datum wählen:</label>
-                <input type="date" id="backfillDateInput" class="text-input-full">
-            </div>
-            <button type="button" class="settings-save" id="btn-confirm-backfill">Zeiten für diesen Tag eintragen</button>
-        </div>
-    </div>
-
-    <!-- MODAL: MONATS-PDF -->
-    <div class="modal-overlay" id="pdf-export-modal">
-        <div class="modal-content">
-            <button type="button" class="close-btn" id="btn-close-pdf-modal">&times;</button>
-            <h2>Monats-PDF Export</h2>
-            <div class="settings-group">
-                <label for="pdfMonthSelect">Monat auswählen</label>
-                <input type="month" id="pdfMonthSelect" class="text-input-full">
-            </div>
-            <div class="settings-group">
-                <label for="pdfUserNamePreview">Name auf dem Stundenzettel</label>
-                <input type="text" id="pdfUserNamePreview" class="text-input-full" placeholder="Dein Name">
-            </div>
-            <div class="pdf-info-tile">
-                Erstellt eine druckfertige DIN-A4-PDF-Datei mit allen Tagen des Monats, Kommen/Gehen-Zeiten, Pausen, Status, Gesamtsaldo sowie Unterschriftszeile.
-            </div>
-            <div class="settings-group">
-                <div class="setting-box-row">
-                    <label class="toggle-label-nowrap" for="pdfAlsoBackupCheck" style="font-size:0.85em;">
-                        <input type="checkbox" id="pdfAlsoBackupCheck" checked>
-                        <span>💾 Auch JSON-Backup mit speichern</span>
-                    </label>
-                </div>
-            </div>
-            <button type="button" class="settings-save" id="btn-download-month-pdf">PDF jetzt herunterladen</button>
-        </div>
-    </div>
-
-    <!-- MODAL: TAG BEARBEITEN -->
-    <div class="modal-overlay" id="day-editor-modal">
-        <div class="modal-content">
-            <button type="button" class="close-btn" id="btn-close-day-editor">&times;</button>
-            <h2 id="day-editor-title">Tag bearbeiten</h2>
-
-            <div class="day-status-grid" id="day-status-chips">
-                <button type="button" class="day-status-chip" data-status="work">Arbeit</button>
-                <button type="button" class="day-status-chip" data-status="vacation">Urlaub</button>
-                <button type="button" class="day-status-chip" data-status="sick">Krank</button>
-                <button type="button" class="day-status-chip" data-status="holiday">Feiertag</button>
-                <button type="button" class="day-status-chip" data-status="free">Frei</button>
-            </div>
-
-            <div id="day-editor-work-area">
-                <div id="day-editor-blocks-list"></div>
-                <button type="button" class="btn-add-block-full" id="btn-editor-add-block">+ Weiteren Zeitblock hinzufügen</button>
-
-                <div class="editor-smoke-bar" id="editor-smoke-bar">
-                    <span style="font-weight:bold; font-size:0.92em;">🚬 Raucherpausen</span>
-                    <div class="editor-smoke-btns">
-                        <button type="button" class="big-step-btn" id="btn-editor-smoke-minus">−</button>
-                        <strong id="editor-smoke-val" style="font-size:1.1em; min-width:34px; text-align:center;">0×</strong>
-                        <button type="button" class="big-step-btn" id="btn-editor-smoke-plus">+</button>
-                    </div>
-                </div>
-            </div>
-
-            <div class="editor-nonwork-tile" id="day-editor-nonwork-note" style="display:none;">
-                Für diesen Status wird keine Arbeitszeit gestempelt.
-            </div>
-
-            <button type="button" class="btn-reset-day" id="btn-reset-day-editor">🗑 Tag zurücksetzen / Zeiten löschen</button>
-            <button type="button" class="settings-save" id="btn-save-day-editor">Übernehmen & Schließen</button>
-        </div>
-    </div>
-
-    <!-- SCREEN 4: MENÜ (EINSTELLUNGEN + 3 UNTERMENÜS) -->
-    <div class="modal-overlay" id="settings-modal">
-        <div class="modal-content" id="settings-modal-card">
-            <button type="button" class="close-btn" id="btn-close-settings">&times;</button>
-
+    <!-- =========================================================
+         MODAL: EINSTELLUNGEN & MENÜ (4 UNTERSEITEN)
+         ========================================================= -->
+    <div id="settings-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Einstellungen">
+        <div class="modal-sheet">
+            <!-- HAUPTSEITE -->
             <div id="settings-page-main">
-                <h2>Menü</h2>
-
-                <div class="settings-group">
-                    <input type="text" id="userNameInput" class="text-input-full" placeholder="Dein Name" aria-label="Dein Name">
+                <div class="modal-header">
+                    <div>
+                        <h2 class="modal-title">Menü & Einstellungen</h2>
+                        <span id="app-version-label" class="modal-subtitle">Version 2.0.1</span>
+                    </div>
+                    <button type="button" id="btn-close-settings" class="modal-close-btn" aria-label="Schließen">✕</button>
                 </div>
 
-                <div class="settings-group">
-                    <button type="button" class="settings-nav-card" id="btn-open-work-subpage">
-                        <div class="settings-nav-info">
-                            <strong>Arbeitszeit & Pausen</strong>
-                            <span id="nav-work-summary">08:00 Std · Raucher-Button aus</span>
+                <div class="modal-body">
+                    <div class="field-group">
+                        <label class="field-label" for="userNameInput">Dein Name (Begrüßung & PDF-Stundenzettel)</label>
+                        <input type="text" id="userNameInput" class="text-input" placeholder="z. B. Andreas">
+                    </div>
+
+                    <button type="button" id="btn-open-work-subpage" class="settings-nav-card">
+                        <div class="snc-text">
+                            <strong>Arbeitszeit, GLZ & Pausen</strong>
+                            <span id="nav-work-summary">08:00/Tag · 40h/Wo · Raucher aus</span>
                         </div>
-                        <div class="settings-nav-right">
-                            <span class="nav-chevron">›</span>
-                        </div>
+                        <span class="snc-arrow">›</span>
                     </button>
-                </div>
 
-                <div class="settings-group">
-                    <button type="button" class="settings-nav-card" id="btn-open-widgets-subpage">
-                        <div class="settings-nav-info">
-                            <strong>Widgets</strong>
-                            <span id="nav-widgets-summary">Pausenwächter aktiv · Beides</span>
+                    <button type="button" id="btn-open-widgets-subpage" class="settings-nav-card">
+                        <div class="snc-text">
+                            <strong>Start-Screen & Pausenwächter</strong>
+                            <span id="nav-widgets-summary">Pausenwächter · Beides</span>
                         </div>
-                        <div class="settings-nav-right">
-                            <span class="nav-chevron">›</span>
-                        </div>
+                        <span class="snc-arrow">›</span>
                     </button>
-                </div>
 
-                <div class="settings-group">
-                    <button type="button" class="settings-nav-card" id="btn-open-design-subpage">
-                        <div class="settings-nav-info">
-                            <strong>Darstellung & Design</strong>
-                            <span id="nav-design-summary">Klassisch · 2 Scribbles</span>
+                    <button type="button" id="btn-open-design-subpage" class="settings-nav-card">
+                        <div class="snc-text">
+                            <strong>Farben, Scribbles & App-Icon</strong>
+                            <span id="nav-design-summary">Klassisch · 2 Scribbles · Icon Blau</span>
                         </div>
-                        <div class="settings-nav-right">
-                            <div class="nav-color-preview">
-                                <span class="mini-dot dot-1"></span>
-                                <span class="mini-dot dot-2"></span>
-                                <span class="mini-dot dot-3"></span>
-                            </div>
-                            <span class="nav-chevron">›</span>
-                        </div>
+                        <span class="snc-arrow">›</span>
                     </button>
-                </div>
 
-                <div class="settings-group">
-                    <div class="backup-card">
-                        <div class="backup-card-top">
-                            <span class="backup-card-title">Datensicherung</span>
-                            <span class="backup-status-pill" id="backup-status-pill">Noch kein Backup</span>
+                    <!-- Backup & Wiederherstellung -->
+                    <div class="sub-box">
+                        <div class="sub-box-head">
+                            <strong>Datensicherung (JSON)</strong>
+                            <span id="backup-status-pill" class="backup-pill">Noch kein Backup</span>
                         </div>
-                        <div class="backup-btn-grid">
-                            <button type="button" class="btn-backup-action" id="btn-export-backup">💾 Sichern</button>
-                            <button type="button" class="btn-backup-action" id="btn-import-backup">📂 Laden</button>
+                        <div class="btn-row-2">
+                            <button type="button" id="btn-export-backup" class="secondary-action-btn">Backup speichern</button>
+                            <button type="button" id="btn-import-backup" class="secondary-action-btn">Backup laden</button>
                         </div>
-                        <button type="button" class="btn-open-pdf-export" id="btn-open-pdf-modal">
-                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                                <polyline points="14 2 14 8 20 8"></polyline>
-                                <line x1="12" y1="18" x2="12" y2="12"></line>
-                                <polyline points="9 15 12 18 15 15"></polyline>
-                            </svg>
-                            <span>Monatsübersicht als PDF</span>
-                        </button>
-                        <input type="file" id="backup-file-input" accept=".json,application/json" style="display:none;">
+                        <input type="file" id="backup-file-input" accept=".json,application/json" style="display: none;">
+                    </div>
+
+                    <div class="btn-row-2">
+                        <button type="button" id="btn-force-update" class="secondary-action-btn">App-Update prüfen</button>
+                        <button type="button" id="btn-save-settings" class="primary-action-btn">Speichern & Fertig</button>
                     </div>
                 </div>
-
-                <div class="version-update-bar">
-                    <span id="app-version-label" style="font-weight:bold;">Version 2.0.0</span>
-                    <button type="button" class="btn-force-update" id="btn-force-update">↻ Update erzwingen</button>
-                </div>
-
-                <button type="button" class="settings-save" id="btn-save-settings">Speichern & Schließen</button>
             </div>
 
+            <!-- UNTERSEITE 1: ARBEITSZEIT, GLZ & PAUSEN -->
             <div id="settings-page-work" style="display: none;">
-                <div class="subpage-header">
-                    <button type="button" class="btn-subpage-back" id="btn-back-from-work">← Zurück</button>
-                    <h2>Arbeitszeit & Pausen</h2>
+                <div class="modal-header">
+                    <button type="button" id="btn-back-from-work" class="modal-back-btn">‹ Zurück</button>
+                    <h2 class="modal-title">Arbeitszeit & GLZ</h2>
+                    <button type="button" id="btn-done-work" class="modal-close-btn">✓</button>
                 </div>
-
-                <div class="design-sub-card">
-                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Tägliche Sollarbeitszeit (Mo–Fr)</label>
-                    <div class="soll-pair">
-                        <input type="text" id="sollHours" class="keypad-bound-input" value="8" inputmode="none" readonly aria-label="Soll Stunden">
-                        <span style="font-weight:bold;">:</span>
-                        <input type="text" id="sollMinutes" class="keypad-bound-input" value="0" inputmode="none" readonly aria-label="Soll Minuten">
-                        <span style="font-size:0.86em; opacity:0.85;">Std : Min</span>
+                <div class="modal-body">
+                    <div class="field-group">
+                        <label class="field-label">Reguläre Soll-Arbeitszeit (Mo–Fr)</label>
+                        <div class="inline-num-row">
+                            <input type="text" id="sollHours" inputmode="none" readonly class="num-pill-input keypad-bound-input" value="8">
+                            <span>Std</span>
+                            <input type="text" id="sollMinutes" inputmode="none" readonly class="num-pill-input keypad-bound-input" value="0">
+                            <span>Min</span>
+                        </div>
                     </div>
-                </div>
 
-                <div class="design-sub-card">
-                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Pausen-Vorwarnung (PWA)</label>
-                    <div class="setting-box-row">
-                        <label class="toggle-label-nowrap" for="pauseNotifyCheck">
+                    <div class="field-group">
+                        <label class="field-label" for="weeklyHoursInput">Vertragliche Wochenstunden (für GBV § 5 Ampel)</label>
+                        <input type="text" id="weeklyHoursInput" inputmode="none" readonly class="text-input keypad-bound-input" value="40">
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label" for="glzBaseInput">GLZ-Startsaldo (Stunden, z. B. +12,5 oder -3,0)</label>
+                        <input type="text" id="glzBaseInput" inputmode="none" readonly class="text-input keypad-bound-input" value="0">
+                    </div>
+
+                    <div class="field-group">
+                        <label class="field-label" for="glzBaseDateInput">GLZ-Stichtag (ab diesem Datum wird gerechnet)</label>
+                        <input type="date" id="glzBaseDateInput" class="text-input">
+                    </div>
+
+                    <div class="sub-box">
+                        <label class="toggle-row">
+                            <span>Push-Vorwarnung vor 30/45-Min-Grenze</span>
                             <input type="checkbox" id="pauseNotifyCheck">
-                            <span>🔔 Vor 30m/45m warnen</span>
                         </label>
-                        <div class="smoker-mins-wrap" id="pauseNotifyMinsWrap">
-                            <input type="text" id="pauseNotifyLeadInput" class="keypad-bound-input" value="10" inputmode="none" readonly aria-label="Vorwarnzeit Minuten">
+                        <div id="pauseNotifyMinsWrap" class="inline-num-row" style="margin-top: 10px;">
+                            <span>Vorwarnung</span>
+                            <input type="text" id="pauseNotifyLeadInput" inputmode="none" readonly class="num-pill-input keypad-bound-input" value="10">
                             <span>Min vorher</span>
                         </div>
                     </div>
-                </div>
 
-                <div class="design-sub-card">
-                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Raucherpausen auf Uhr</label>
-                    <div class="setting-box-row">
-                        <label class="toggle-label-nowrap" for="isSmokerCheck">
+                    <div class="sub-box">
+                        <label class="toggle-row">
+                            <span>🚬 Raucherpausen erfassen</span>
                             <input type="checkbox" id="isSmokerCheck">
-                            <span>🚬 Button anzeigen</span>
                         </label>
-                        <div class="smoker-mins-wrap" id="smokerMinsWrap">
-                            <input type="text" id="smokeMinutesInput" class="keypad-bound-input" value="5" inputmode="none" readonly aria-label="Raucherpause Minuten">
-                            <span>Min/Gang</span>
+                        <div id="smokerMinsWrap" class="inline-num-row" style="margin-top: 10px;">
+                            <span>Dauer je Pause</span>
+                            <input type="text" id="smokeMinutesInput" inputmode="none" readonly class="num-pill-input keypad-bound-input" value="5">
+                            <span>Min</span>
                         </div>
                     </div>
                 </div>
-
-                <div class="design-sub-card">
-                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:4px;">Ampelkonto (GBV § 5)</label>
-                    <div style="font-size:0.76em; opacity:0.86; margin-bottom:7px; line-height:1.3;">
-                        Stand der echten Stempeluhr vor Arbeitsbeginn am Stichtag eintragen:
-                    </div>
-                    <div class="ampel-settings-grid">
-                        <div class="ampel-field-box">
-                            <span>GLZ-Startsaldo (h)</span>
-                            <input type="text" id="glzBaseInput" class="keypad-bound-input" value="0" inputmode="none" readonly aria-label="GLZ Startsaldo">
-                        </div>
-                        <div class="ampel-field-box">
-                            <span>Stichtag (ab Datum)</span>
-                            <input type="date" id="glzBaseDateInput">
-                        </div>
-                        <div class="ampel-field-box" style="grid-column: 1 / -1; margin-top: 2px;">
-                            <span>Vertragliche Wochenstunden</span>
-                            <input type="text" id="weeklyHoursInput" class="keypad-bound-input" value="40" inputmode="none" readonly aria-label="Wochenstunden">
-                        </div>
-                    </div>
-                </div>
-
-                <button type="button" class="settings-save" id="btn-done-work">Fertig</button>
             </div>
 
-            <!-- UNTERMENÜ: WIDGETS -->
+            <!-- UNTERSEITE 2: START-SCREEN & PAUSENWÄCHTER -->
             <div id="settings-page-widgets" style="display: none;">
-                <div class="subpage-header">
-                    <button type="button" class="btn-subpage-back" id="btn-back-from-widgets">← Zurück</button>
-                    <h2>Widgets</h2>
+                <div class="modal-header">
+                    <button type="button" id="btn-back-from-widgets" class="modal-back-btn">‹ Zurück</button>
+                    <h2 class="modal-title">Pausenwächter</h2>
+                    <button type="button" id="btn-done-widgets" class="modal-close-btn">✓</button>
                 </div>
-
-                <div class="design-sub-card">
-                    <div class="setting-box-row" style="margin-bottom: 8px;">
-                        <label class="toggle-label-nowrap" for="pauseWatcherEnabledCheck">
+                <div class="modal-body">
+                    <div class="sub-box">
+                        <label class="toggle-row">
+                            <span>Pausenwächter auf Start-Screen zeigen</span>
                             <input type="checkbox" id="pauseWatcherEnabledCheck" checked>
-                            <span>⏱️ Pausenwächter</span>
                         </label>
-                    </div>
-
-                    <div id="pause-watcher-options-wrap">
-                        <label style="display:block; font-weight:bold; font-size:0.84em; margin-bottom:6px;">Startbildschirm-Modus</label>
-                        <div class="widget-mode-pills" id="pause-watcher-mode-pills" role="radiogroup" aria-label="Startbildschirm-Modus">
-                            <button type="button" class="widget-mode-pill" data-pw-mode="go">Nur bei Gehen</button>
-                            <button type="button" class="widget-mode-pill" data-pw-mode="come">Nur bei Kommen</button>
-                            <button type="button" class="widget-mode-pill" data-pw-mode="both">Beides</button>
+                        <div id="pause-watcher-options-wrap" style="margin-top: 12px;">
+                            <span class="field-label">Anzeigen im Modus:</span>
+                            <div id="pause-watcher-mode-pills" class="widget-mode-pills" role="radiogroup">
+                                <button type="button" class="widget-mode-pill" data-pw-mode="go" role="radio" aria-checked="false">Nur Gehen</button>
+                                <button type="button" class="widget-mode-pill" data-pw-mode="come" role="radio" aria-checked="false">Nur Kommen</button>
+                                <button type="button" class="widget-mode-pill selected" data-pw-mode="both" role="radio" aria-checked="true">Beides</button>
+                            </div>
                         </div>
                     </div>
-
-                    <div style="font-size:0.76em; opacity:0.86; margin-top:8px; line-height:1.35;">
-                        Zeigt bei laufender Stempelung den Countdown bis zur 30-Min-Grenze (06:00:00 Netto) und danach den 45er-Warner bis zur 9:00-Std-Grenze – inkl. Anrechnung ausgestempelter Pausen.
-                    </div>
+                    <p class="helper-note">
+                        Tipp: Auf der Hauptansicht kannst du jederzeit <strong>nach oben wischen</strong> („Kommen“-Startscreen) oder <strong>nach unten wischen</strong> („Gehen“-Startscreen).
+                    </p>
                 </div>
-
-                <button type="button" class="settings-save" id="btn-done-widgets">Fertig</button>
             </div>
 
+            <!-- UNTERSEITE 3: FARBEN, SCRIBBLES & APP-ICON -->
             <div id="settings-page-design" style="display: none;">
-                <div class="subpage-header">
-                    <button type="button" class="btn-subpage-back" id="btn-back-from-design">← Zurück</button>
-                    <h2>Darstellung & Design</h2>
+                <div class="modal-header">
+                    <button type="button" id="btn-back-from-design" class="modal-back-btn">‹ Zurück</button>
+                    <h2 class="modal-title">Design & Icons</h2>
+                    <button type="button" id="btn-done-design" class="modal-close-btn">✓</button>
                 </div>
-
-                <div class="design-sub-card">
-                    <label for="styleModeSelect" style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:5px;">Form-Design</label>
-                    <select id="styleModeSelect" class="harmony-select">
-                        <option value="classic" selected>Klassisch (gleichmäßige Ecken)</option>
-                        <option value="asymmetric">Asymmetrisch & Organisch</option>
-                    </select>
-                    <div class="slider-control" id="asymSliderWrap" style="display: none;">
-                        <label for="asymIntensitySlider">
-                            <span>Stärke der Asymmetrie:</span>
-                            <span><span id="asymIntensityVal">55</span>%</span>
-                        </label>
-                        <input type="range" id="asymIntensitySlider" min="0" max="100" value="55">
-                    </div>
-                </div>
-
-                <div class="design-sub-card color-wheel-container">
-                    <label style="width:100%; font-weight:bold; font-size:0.9em; margin-bottom:6px;">OKLCH-Farbharmonie (Kontrast-Garantie)</label>
-                    <canvas id="colorWheel" width="165" height="165"></canvas>
-                    <div class="color-preview">
-                        <div class="color-dot dot-1" title="Text & Rahmen"></div>
-                        <div class="color-dot dot-2" title="Kommen (Primär)"></div>
-                        <div class="color-dot dot-3" title="Gehen (Gegenfarbe)"></div>
-                    </div>
-                    <div class="slider-control">
-                        <label for="lightnessSlider">
-                            <span>Helligkeit Kacheln:</span>
-                            <span><span id="lightnessVal">44</span>%</span>
-                        </label>
-                        <input type="range" id="lightnessSlider" min="28" max="52" value="44">
-                    </div>
-                </div>
-
-                <div class="scribble-accordion-card" id="scribble-accordion-card">
-                    <button type="button" class="scribble-accordion-btn" id="btn-toggle-scribble-accordion" aria-expanded="false">
-                        <div class="scribble-accordion-title-wrap">
-                            <span class="scribble-accordion-title">Start-Scribbles (32 Motive)</span>
-                            <span class="scribble-accordion-meta" id="scribble-accordion-meta">2/5 aktiv · Größe 50% · Antippen zum Aufklappen</span>
-                        </div>
-                        <div class="scribble-accordion-right">
-                            <div class="scribble-mini-strip" id="scribble-mini-strip"></div>
-                            <span class="scribble-chevron" id="scribble-chevron">›</span>
-                        </div>
-                    </button>
-
-                    <div class="scribble-accordion-body" id="scribble-accordion-body">
-                        <div class="scribble-picker-head">
-                            <span style="font-size:0.8em; font-weight:bold;">Motive wählen (max. 5)</span>
-                            <span class="scribble-count-tag" id="scribble-count-tag">2 / 5</span>
-                        </div>
-                        <div class="scribble-svg-grid" id="scribble-svg-grid"></div>
-                        <div class="slider-control">
-                            <label for="scribbleSizeSlider">
-                                <span>Scribble-Größe:</span>
-                                <span><span id="scribbleSizeVal">50</span>%</span>
-                            </label>
-                            <input type="range" id="scribbleSizeSlider" min="15" max="100" value="50">
+                <div class="modal-body">
+                    <!-- OKLCH Farbrad & Helligkeit -->
+                    <div class="sub-box center-box">
+                        <span class="field-label">App-Farbton (OKLCH) & Helligkeit</span>
+                        <canvas id="colorWheel" width="180" height="180" aria-label="Farbrad"></canvas>
+                        <div class="slider-row">
+                            <span>Helligkeit: <strong id="lightnessVal">44</strong>%</span>
+                            <input type="range" id="lightnessSlider" min="28" max="52" value="44">
                         </div>
                     </div>
-                </div>
 
-                <div class="design-sub-card">
-                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:7px;">App-Icon (für Startbildschirm)</label>
-                    <div class="icon-variant-grid" id="icon-variant-grid">
-                        <button type="button" class="icon-variant-card selected" data-icon-theme="blue">
-                            <img src="./favicon_192.png" alt="Blau / Cyan">
-                            <span>Blau / Cyan</span>
+                    <!-- App-Icon Variante (Blau/Cyan vs. Rosé/Berry) -->
+                    <div class="sub-box">
+                        <span class="field-label">App-Icon & Favicon-Variante</span>
+                        <div id="icon-variant-grid" class="icon-variant-grid">
+                            <button type="button" class="icon-variant-card selected" data-icon-theme="blue">
+                                <img src="./favicon_192.png" alt="Icon Blau/Cyan">
+                                <span>Blau / Cyan</span>
+                            </button>
+                            <button type="button" class="icon-variant-card" data-icon-theme="rose">
+                                <img src="./favicon_rose_192.png" alt="Icon Rosé/Berry">
+                                <span>Rosé / Berry</span>
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Kachel-Stil -->
+                    <div class="sub-box">
+                        <label class="field-label" for="styleModeSelect">Kachel-Geometrie</label>
+                        <select id="styleModeSelect" class="text-input">
+                            <option value="classic">Klassisch & Kompakt</option>
+                            <option value="asymmetric">Organisch / Asymmetrisch</option>
+                        </select>
+                        <div id="asymSliderWrap" class="slider-row" style="display: none; margin-top: 10px;">
+                            <span>Intensität: <strong id="asymIntensityVal">55</strong>%</span>
+                            <input type="range" id="asymIntensitySlider" min="0" max="100" value="55">
+                        </div>
+                    </div>
+
+                    <!-- 32 Scribble-Motive Akkordeon -->
+                    <div id="scribble-accordion-card" class="scribble-accordion-card">
+                        <button type="button" id="btn-toggle-scribble-accordion" class="scribble-accordion-btn" aria-expanded="false">
+                            <div class="scribble-acc-left">
+                                <strong>Start-Screen Scribbles</strong>
+                                <span id="scribble-accordion-meta">2/5 aktiv · Größe 50% · Aufklappen</span>
+                            </div>
+                            <div id="scribble-mini-strip" class="scribble-mini-strip"></div>
                         </button>
-                        <button type="button" class="icon-variant-card" data-icon-theme="rose">
-                            <img src="./favicon_rose_192.png" alt="Rosé / Berry">
-                            <span>Rosé / Berry</span>
-                        </button>
-                    </div>
-                    <div class="icon-install-hint">
-                        Hinweis: Vor dem Tippen auf „App installieren“ auswählen, damit das gewünschte Icon auf dem Startbildschirm landet.
+
+                        <div class="scribble-accordion-panel">
+                            <div class="scribble-panel-top">
+                                <span>Bis zu 5 Motive wählen:</span>
+                                <strong id="scribble-count-tag">2 / 5</strong>
+                            </div>
+                            <div class="slider-row" style="margin-bottom: 10px;">
+                                <span>Größe: <strong id="scribbleSizeVal">50</strong>%</span>
+                                <input type="range" id="scribbleSizeSlider" min="15" max="100" value="50">
+                            </div>
+                            <div id="scribble-svg-grid" class="scribble-svg-grid"></div>
+                        </div>
                     </div>
                 </div>
-
-                <button type="button" class="settings-save" id="btn-done-design">Fertig</button>
             </div>
         </div>
     </div>
 
+    <!-- =========================================================
+         MODAL: TAGES-EDITOR (WOCHENANSICHT)
+         ========================================================= -->
+    <div id="day-editor-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Tag bearbeiten">
+        <div class="modal-sheet">
+            <div class="modal-header">
+                <h2 id="day-editor-title" class="modal-title">Montag, 16.11.2026</h2>
+                <button type="button" id="btn-close-day-editor" class="modal-close-btn" aria-label="Schließen">✕</button>
+            </div>
+            <div class="modal-body">
+                <div id="day-status-chips" class="status-chips-row">
+                    <button type="button" class="day-status-chip selected" data-status="work">Arbeit</button>
+                    <button type="button" class="day-status-chip" data-status="vacation">Urlaub</button>
+                    <button type="button" class="day-status-chip" data-status="sick">Krank</button>
+                    <button type="button" class="day-status-chip" data-status="holiday">Feiertag</button>
+                    <button type="button" class="day-status-chip" data-status="free">Frei</button>
+                </div>
+
+                <div id="day-editor-work-area">
+                    <div id="day-editor-blocks-list"></div>
+
+                    <div class="editor-tools-row">
+                        <button type="button" id="btn-editor-add-block" class="secondary-action-btn">+ Zeitblock</button>
+                        <div class="editor-smoke-box">
+                            <span>🚬</span>
+                            <button type="button" id="btn-editor-smoke-minus" class="smoke-step-btn">−</button>
+                            <strong id="editor-smoke-val">0×</strong>
+                            <button type="button" id="btn-editor-smoke-plus" class="smoke-step-btn">+</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="day-editor-nonwork-note" class="helper-note" style="display: none;">
+                    Bei Urlaub, Krankheit oder Feiertag wird automatisch dein Tagessoll (Mo–Fr) gutgeschrieben. Bei „Frei“ wird 00:00 h gewertet (Gleitzeitabbau bzw. Wochenende).
+                </div>
+
+                <div class="btn-row-2" style="margin-top: 14px;">
+                    <button type="button" id="btn-reset-day-editor" class="danger-action-btn">Zurücksetzen</button>
+                    <button type="button" id="btn-save-day-editor" class="primary-action-btn">Übernehmen</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL: TAG NACHTRAGEN
+         ========================================================= -->
+    <div id="backfill-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Tag nachtragen">
+        <div class="modal-sheet modal-compact">
+            <div class="modal-header">
+                <h2 class="modal-title">Tag nachtragen</h2>
+                <button type="button" id="btn-close-backfill-modal" class="modal-close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="btn-row-2">
+                    <button type="button" id="btn-quick-sat" class="secondary-action-btn">
+                        Samstag (<span id="quick-sat-date">--.--.</span>)
+                    </button>
+                    <button type="button" id="btn-quick-sun" class="secondary-action-btn">
+                        Sonntag (<span id="quick-sun-date">--.--.</span>)
+                    </button>
+                </div>
+                <div class="field-group" style="margin-top: 12px;">
+                    <label class="field-label" for="backfillDateInput">Oder beliebiges Datum wählen:</label>
+                    <input type="date" id="backfillDateInput" class="text-input">
+                </div>
+                <button type="button" id="btn-confirm-backfill" class="primary-action-btn" style="width: 100%;">Tag öffnen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- =========================================================
+         MODAL: MONATS-PDF EXPORT
+         ========================================================= -->
+    <div id="pdf-export-modal" class="modal-backdrop" role="dialog" aria-modal="true" aria-label="Monats-PDF erstellen">
+        <div class="modal-sheet modal-compact">
+            <div class="modal-header">
+                <h2 class="modal-title">Monats-PDF erstellen</h2>
+                <button type="button" id="btn-close-pdf-modal" class="modal-close-btn">✕</button>
+            </div>
+            <div class="modal-body">
+                <div class="field-group">
+                    <label class="field-label" for="pdfMonthSelect">Monat auswählen</label>
+                    <input type="month" id="pdfMonthSelect" class="text-input">
+                </div>
+                <div class="field-group">
+                    <label class="field-label" for="pdfUserNamePreview">Name auf dem Stundenzettel</label>
+                    <input type="text" id="pdfUserNamePreview" class="text-input" placeholder="Vor- und Nachname">
+                </div>
+                <label class="toggle-row" style="margin-bottom: 14px;">
+                    <span>Zusätzlich JSON-Backup speichern</span>
+                    <input type="checkbox" id="pdfAlsoBackupCheck" checked>
+                </label>
+                <button type="button" id="btn-download-month-pdf" class="primary-action-btn" style="width: 100%;">PDF herunterladen</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Offline-gecachte jsPDF-Bibliothek & Anwendungslogik -->
+    <script src="./jspdf.umd.min.js"></script>
+    <script src="./app.js"></script>
     <script>
-      if ('serviceWorker' in navigator) {
-        navigator.serviceWorker.register('./sw.js?v=200');
-      }
+        if ("serviceWorker" in navigator) {
+            window.addEventListener("load", () => {
+                navigator.serviceWorker.register("./sw.js").catch(() => {});
+            });
+        }
     </script>
 </body>
 </html>
