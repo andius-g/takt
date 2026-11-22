@@ -1,183 +1,215 @@
 <!DOCTYPE html>
-<html lang="de" data-style="classic">
+<!-- =========================================================
+     STEMPELUHR & WOCHENÜBERSICHT — VERSION 2.0.0
+     ========================================================= -->
+<html lang="de">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
-    <meta name="theme-color" id="meta-theme-color" content="#000000">
-    <meta name="mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <title>Stempeluhr</title>
-    <link rel="manifest" href="manifest.json">
-    <link rel="icon" type="image/png" href="favicon.png">
-    <link rel="apple-touch-icon" href="favicon.png">
-    <link rel="stylesheet" href="style.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta name="theme-color" id="meta-theme-color" content="#eaf4f8">
+    <title>Stempeluhr & Wochenübersicht (v2.0.0)</title>
+
+    <link rel="manifest" id="app-manifest-link" href="./manifest.json">
+    <link rel="icon" id="fav-32" type="image/png" sizes="32x32" href="./favicon_32.png">
+    <link rel="icon" id="fav-192" type="image/png" sizes="192x192" href="./favicon_192.png">
+    <link rel="icon" id="fav-base" href="./favicon.png" type="image/png">
+    <link rel="apple-touch-icon" id="fav-apple" sizes="180x180" href="./favicon_180.png">
+    <link rel="stylesheet" href="./styles.css?v=200">
+
     <script>
-        const APP_VERSION = "1.24";
+        const APP_VERSION = "2.0.0";
 
         window.hslToHex = function(h, s, l) {
             h = ((h % 360) + 360) % 360;
-            s /= 100;
-            l /= 100;
-            const k = n => (n + h / 30) % 12;
+            s /= 100; l /= 100;
             const a = s * Math.min(l, 1 - l);
-            const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1)));
-            const toHex = x => Math.round(x * 255).toString(16).padStart(2, "0");
-            return "#" + toHex(f(0)) + toHex(f(8)) + toHex(f(4));
+            const f = n => {
+                const k = (n + h / 30) % 12;
+                const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+                return Math.round(255 * color).toString(16).padStart(2, '0');
+            };
+            return `#${f(0)}${f(8)}${f(4)}`;
         };
 
-        (function initEarlyTheme() {
-            const hue = parseInt(localStorage.getItem("appHue"), 10);
-            const safeHue = isNaN(hue) ? 195 : hue;
-            const light = parseInt(localStorage.getItem("appLightness"), 10);
-            const safeLight = isNaN(light) ? 46 : Math.min(52, Math.max(28, light));
+        window.supportsOklch = (function() {
+            try {
+                return typeof CSS !== "undefined" && typeof CSS.supports === "function" && CSS.supports("color", "oklch(0.55 0.19 220)");
+            } catch (e) {
+                return false;
+            }
+        })();
+
+        window.computeOklchPalette = function(hue, lightnessPct) {
+            const h = ((Number(hue) || 0) % 360 + 360) % 360;
+            const normL = Math.min(1, Math.max(0, ((Number(lightnessPct) || 44) - 28) / 24));
+            // Kontrast-Korridor für weiße Schrift (#fff) auf satten Vollton-Kacheln (ca. 0.49 .. 0.57)
+            const primaryL = (0.49 + normL * 0.08).toFixed(3);
+            const primaryHoverL = (Math.max(0.42, parseFloat(primaryL) - 0.06)).toFixed(3);
+            const secondaryH = (h + 150) % 360;
+            const secondaryL = primaryL;
+            const secondaryHoverL = primaryHoverL;
+            const chroma = (0.175 + normL * 0.025).toFixed(3);
+
+            const bgHue = (h + 120) % 360;
+            const bgOklch = `oklch(0.955 0.032 ${bgHue})`;
+            const cardOklch = `oklch(0.905 0.048 ${bgHue})`;
+            const subcardOklch = `oklch(0.972 0.024 ${bgHue})`;
+            const textOklch = `oklch(0.27 0.095 ${((h - 125) % 360 + 360) % 360})`;
+            const borderOklch = `oklch(0.76 0.065 ${h})`;
+            const primaryOklch = `oklch(${primaryL} ${chroma} ${h})`;
+            const primaryHoverOklch = `oklch(${primaryHoverL} ${chroma} ${h})`;
+            const secondaryOklch = `oklch(${secondaryL} ${chroma} ${secondaryH})`;
+            const secondaryHoverOklch = `oklch(${secondaryHoverL} ${chroma} ${secondaryH})`;
+
+            const fallbackBgHex = window.hslToHex(bgHue, 52, 93);
+            const fallbackPrimaryHex = window.hslToHex(h, 82, 42);
+            const fallbackSecondaryHex = window.hslToHex(secondaryH, 82, 42);
+
+            return {
+                useOklch: window.supportsOklch,
+                bg: window.supportsOklch ? bgOklch : fallbackBgHex,
+                cardBg: window.supportsOklch ? cardOklch : window.hslToHex(bgHue, 46, 87),
+                subcardBg: window.supportsOklch ? subcardOklch : window.hslToHex(bgHue, 48, 95),
+                text: window.supportsOklch ? textOklch : window.hslToHex(h - 125, 65, 22),
+                border: window.supportsOklch ? borderOklch : window.hslToHex(h, 35, 74),
+                primary: window.supportsOklch ? primaryOklch : fallbackPrimaryHex,
+                primaryHover: window.supportsOklch ? primaryHoverOklch : window.hslToHex(h, 86, 36),
+                secondary: window.supportsOklch ? secondaryOklch : fallbackSecondaryHex,
+                secondaryHover: window.supportsOklch ? secondaryHoverOklch : window.hslToHex(secondaryH, 86, 36),
+                metaBg: fallbackBgHex,
+                metaWelcome: window.hslToHex(h, 55, 20),
+                primaryL: parseFloat(primaryL),
+                chroma: parseFloat(chroma)
+            };
+        };
+
+        window.applyAppIconTheme = function(theme) {
+            const isRose = theme === "rose";
+            const manifestEl = document.getElementById("app-manifest-link");
+            const fav32 = document.getElementById("fav-32");
+            const fav192 = document.getElementById("fav-192");
+            const favBase = document.getElementById("fav-base");
+            const favApple = document.getElementById("fav-apple");
+
+            if (manifestEl) manifestEl.setAttribute("href", isRose ? "./manifest-rose.json" : "./manifest.json");
+            if (fav32) fav32.setAttribute("href", isRose ? "./favicon_rose_32.png" : "./favicon_32.png");
+            if (fav192) fav192.setAttribute("href", isRose ? "./favicon_rose_192.png" : "./favicon_192.png");
+            if (favBase) favBase.setAttribute("href", isRose ? "./favicon_rose_192.png" : "./favicon.png");
+            if (favApple) favApple.setAttribute("href", isRose ? "./favicon_rose_180.png" : "./favicon_180.png");
+        };
+
+        (function() {
+            const h = parseInt(localStorage.getItem("appHue"), 10);
+            const l = parseInt(localStorage.getItem("appLightness"), 10);
+            const hue = isNaN(h) ? 195 : h;
+            const light = isNaN(l) ? 44 : Math.min(52, Math.max(28, l));
+
             const styleMode = localStorage.getItem("appStyleMode") === "asymmetric" ? "asymmetric" : "classic";
-            const asymRaw = parseInt(localStorage.getItem("appAsymIntensity"), 10);
-            const safeAsym = isNaN(asymRaw) ? 55 : Math.min(100, Math.max(0, asymRaw));
+            const rawIntensity = parseInt(localStorage.getItem("appAsymIntensity"), 10);
+            const intensity = isNaN(rawIntensity) ? 55 : Math.min(100, Math.max(0, rawIntensity));
 
-            document.documentElement.setAttribute("data-style", styleMode);
-            document.documentElement.style.setProperty("--hue", safeHue);
-            document.documentElement.style.setProperty("--lightness", safeLight + "%");
-            document.documentElement.style.setProperty("--asym-intensity", (safeAsym / 100).toFixed(3));
+            const pal = window.computeOklchPalette(hue, light);
+            const root = document.documentElement;
+            root.setAttribute("data-style", styleMode);
+            root.style.setProperty("--hue", hue);
+            root.style.setProperty("--lightness", light + "%");
+            root.style.setProperty("--asym-intensity", (intensity / 100).toFixed(3));
+            root.style.setProperty("--bg-color", pal.bg);
+            root.style.setProperty("--card-bg", pal.cardBg);
+            root.style.setProperty("--subcard-bg", pal.subcardBg);
+            root.style.setProperty("--text-color", pal.text);
+            root.style.setProperty("--border-color", pal.border);
+            root.style.setProperty("--primary-color", pal.primary);
+            root.style.setProperty("--primary-hover", pal.primaryHover);
+            root.style.setProperty("--secondary-color", pal.secondary);
+            root.style.setProperty("--secondary-hover", pal.secondaryHover);
+            root.style.backgroundColor = pal.bg;
 
-            const bgHex = window.hslToHex(safeHue + 120, 50, 95);
-            document.documentElement.style.backgroundColor = "#000000";
             const meta = document.getElementById("meta-theme-color");
-            if (meta) meta.setAttribute("content", "#000000");
+            if (meta) meta.setAttribute("content", pal.metaBg);
+
+            const savedIconTheme = localStorage.getItem("appIconTheme") === "rose" ? "rose" : "blue";
+            window.applyAppIconTheme(savedIconTheme);
         })();
     </script>
+
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Stempeluhr">
+
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js" defer></script>
-    <script src="app.js" defer></script>
+    <script src="./app.js?v=200" defer></script>
 </head>
 <body>
-<div id="edge-bg-layer"></div>
-    <div id="bg-hour-watermark">08</div>
+    <div class="edge-bg-layer" id="edge-bg-layer"></div>
 
-    <!-- VOLLBILD-HOME-SCREEN -->
-    <div class="welcome-overlay" id="welcome-overlay">
+    <!-- SCREEN 1: START (KOMMEN / GEHEN) + SCRIBBLES + PAUSENWÄCHTER -->
+    <section class="welcome-overlay" id="welcome-overlay" aria-label="Start">
         <div class="welcome-scatter-field" id="welcome-scatter-field"></div>
 
         <div class="welcome-top-area">
-            <div class="welcome-top-bar">
-                <span class="welcome-mode-pill" id="welcome-mode-pill">Modus: Kommen</span>
-                <button type="button" class="btn-widget-edit-toggle" id="btn-toggle-widget-edit" title="Widgets anpassen">⊞</button>
-            </div>
-            <div class="welcome-greeting-block">
-                <h1 class="welcome-greeting" id="welcome-greeting">Guten Morgen!</h1>
-                <div class="welcome-date-sub" id="welcome-date-sub">Samstag, 21.11.2026</div>
-            </div>
-            <div class="widget-editor-bar" id="widget-editor-bar">
-                <button type="button" class="w-bar-btn" id="btn-open-widget-catalog">+ Widget</button>
-                <button type="button" class="w-bar-btn" id="btn-preview-switch-mode">Kommen / Gehen</button>
-                <button type="button" class="w-bar-btn" id="btn-reset-widgets">Standard</button>
-                <button type="button" class="w-bar-btn primary" id="btn-done-widget-edit">Fertig</button>
-            </div>
+            <div class="welcome-date-sub" id="welcome-date-sub">-</div>
+            <h1 class="welcome-greeting" id="welcome-greeting">Guten Morgen!</h1>
         </div>
 
-        <div class="home-widget-grid" id="home-widget-grid"></div>
+        <div class="welcome-actions-stack" id="welcome-actions-stack">
+            <!-- PAUSENWÄCHTER-WIDGET -->
+            <div class="welcome-pause-widget" id="welcome-pause-widget" style="display: none;" aria-live="polite">
+                <div class="wpw-top-row">
+                    <span class="wpw-badge" id="wpw-badge">30-Min-Grenze</span>
+                    <span class="wpw-limit-time" id="wpw-limit-time">bis --:--:--</span>
+                </div>
+                <div class="wpw-countdown" id="wpw-countdown">00:00:00</div>
+                <div class="wpw-sub-status" id="wpw-sub-status"></div>
+            </div>
 
-        <div class="welcome-swipe-hint">
-            ↑ Kommen · ↓ Gehen · ← Menü · → Woche
+            <button type="button" class="btn-welcome-action" id="btn-welcome-action">
+                <strong id="welcome-action-title">Kommen</strong>
+                <span id="welcome-action-sub">Jetzt direkt einstempeln</span>
+            </button>
+
+            <button type="button" class="btn-welcome-menu" id="btn-welcome-menu">
+                <div class="welcome-big-clock" id="welcome-big-clock">--:--:--</div>
+                <div class="welcome-menu-hint">Zur Uhr →</div>
+            </button>
+
+            <div class="nav-compass-hint" id="welcome-compass-hint">
+                <span>← Woche</span>
+                <span id="welcome-vertical-hint">↕ Kommen / Gehen</span>
+                <span>Uhr →</span>
+            </div>
         </div>
-    </div>
+    </section>
 
-    <!-- HAUPT-APP -->
-    <div class="app-shell">
-        <header class="top-header">
-            <div style="display: flex; align-items: center; gap: 8px;">
-                <button type="button" class="icon-btn" id="btn-go-home" title="Startbildschirm (Home)">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                        <polyline points="9 22 9 12 15 12 15 22"></polyline>
-                    </svg>
-                </button>
-                <h1 class="app-title" id="app-title" style="cursor: pointer;" title="Zum Startbildschirm">Stempeluhr</h1>
+    <!-- HAUPT-APP (SCREEN 2 UHR & SCREEN 3 WOCHE) MIT DAUMENZONE UNTEN -->
+    <div class="container" id="app-container">
+        <header class="top-header-card">
+            <div class="live-clock-box" id="live-clock-box" title="3 Sek. halten für Notfall-Update">
+                <div class="live-time" id="live-clock-time">--:--:--</div>
+                <div class="live-weekday" id="live-clock-day">-</div>
             </div>
-            <div class="header-actions">
-                <button type="button" class="icon-btn" id="btn-toggle-view" title="Wochenbilanz">
-                    <svg id="icon-view-week" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                    </svg>
-                    <svg id="icon-view-clock" style="display:none;" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <polyline points="12 6 12 12 16 14"></polyline>
-                    </svg>
-                </button>
-                <button type="button" class="icon-btn" id="btn-settings" title="Einstellungen">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                        <circle cx="12" cy="12" r="3"></circle>
-                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                </button>
-            </div>
+            <div class="header-status-chip" id="header-status-chip">Bereit</div>
         </header>
 
-        <div class="view-stage">
+        <div class="views-stage" id="views-stage">
+            <!-- SCREEN 2: UHR -->
             <div id="view-clock" class="view-section active">
-                <div class="feature-section">
-                    <div class="live-clock-card">
-                        <div class="live-clock-time" id="live-clock-time">08:00:00</div>
-                        <div class="live-clock-day" id="live-clock-day">Samstag, 21.11.2026</div>
-                    </div>
+                <div class="feature-section clock-layout-card">
+                    <div class="bg-hour-watermark" id="bg-hour-watermark">--</div>
 
-                    <div class="stamp-action-grid">
-                        <button type="button" class="btn-stamp-big btn-stamp-come" id="btn-now-start">Kommen</button>
-                        <button type="button" class="btn-stamp-big btn-stamp-go" id="btn-now-end">Gehen</button>
-                    </div>
-
-                    <div class="time-inputs-card">
-                        <div class="time-pair-box">
-                            <span class="time-pair-label">Kommen</span>
-                            <div class="hhmm-inputs">
-                                <input type="number" id="startHours" min="0" max="23" placeholder="hh" inputmode="numeric">
-                                <span>:</span>
-                                <input type="number" id="startMinutes" min="0" max="59" placeholder="mm" inputmode="numeric">
-                            </div>
+                    <div class="output-container">
+                        <div class="output">
+                            <h3>Keine Pause (gehen um):</h3>
+                            <div id="output-no-pause">-</div>
                         </div>
-                        <div class="time-pair-box">
-                            <span class="time-pair-label">Gehen</span>
-                            <div class="hhmm-inputs">
-                                <input type="number" id="endHours" min="0" max="23" placeholder="hh" inputmode="numeric">
-                                <span>:</span>
-                                <input type="number" id="endMinutes" min="0" max="59" placeholder="mm" inputmode="numeric">
-                            </div>
+                        <div class="output">
+                            <h3>30 min Pause (von - bis):</h3>
+                            <div id="output-30min-pause-range">-</div>
                         </div>
-                        <button type="button" class="btn-undo-mini" id="btn-undo" disabled title="Rückgängig">↺</button>
-                    </div>
-
-                    <div class="smoke-bar" id="smoke-bar">
-                        <button type="button" class="smoke-step-btn" id="btn-sub-smoke">−</button>
-                        <div class="smoke-bar-info">🚬 Raucherpause: <span id="smoke-count-display">0× (-0m)</span></div>
-                        <button type="button" class="smoke-step-btn" id="btn-add-smoke">+</button>
-                    </div>
-
-                    <div class="pause-results-card">
-                        <div class="pause-row">
-                            <span>Ohne Pause bis:</span>
-                            <strong id="output-no-pause">-</strong>
-                        </div>
-                        <div class="pause-row">
-                            <span>30 Min Pause:</span>
-                            <strong id="output-30min-pause-range">-</strong>
-                        </div>
-                        <div class="pause-row">
-                            <span>45 Min Pause ab:</span>
-                            <strong id="output-45min-pause">-</strong>
-                        </div>
-                    </div>
-
-                    <div class="sessions-box" id="sessions-box" style="display: none;">
-                        <div class="sessions-header">
-                            <span>Zeitblöcke heute</span>
-                            <span id="sessions-pres-sum">Anwesenheit: 00:00 h</span>
-                        </div>
-                        <div id="sessions-list"></div>
-                        <div class="sessions-break-info" id="sessions-break-info" style="display: none;">
-                            <span>Unterbrechung (abwesend):</span>
-                            <strong id="sessions-gap-sum">0 min</strong>
+                        <div class="output">
+                            <h3>45 min Pause (ab):</h3>
+                            <div id="output-45min-pause">-</div>
                         </div>
                     </div>
 
@@ -192,68 +224,94 @@
                             <div id="output-overtime">-</div>
                         </div>
                     </div>
-                    <div class="spatial-nav-pills">
-                        <button type="button" class="spatial-nav-btn" id="nav-btn-home-from-clock">⌂ Wischschirm</button>
-                        <button type="button" class="spatial-nav-btn" id="nav-btn-week-from-clock">Wochenbilanz →</button>
+
+                    <div class="sessions-box" id="sessions-box" style="display: none;">
+                        <div class="sessions-header">
+                            <span>Stempel-Blöcke heute</span>
+                            <span id="sessions-pres-sum">00:00 h</span>
+                        </div>
+                        <div id="sessions-list"></div>
+                        <div class="sessions-break-info" id="sessions-break-info" style="display: none;">
+                            <span>Unterbrechung (abwesend):</span>
+                            <strong id="sessions-gap-sum">0 min</strong>
+                        </div>
+                    </div>
+
+                    <div class="thumb-action-cluster">
+                        <div class="time-input-pair" id="smoke-bar" style="display: none;">
+                            <button type="button" class="btn-now" id="btn-add-smoke">🚬 Raucherpause</button>
+                            <div class="smoke-counter-box">
+                                <span id="smoke-count-display">0× (-0m)</span>
+                                <button type="button" class="btn-smoke-minus" id="btn-sub-smoke" title="Eine Pause abziehen">−</button>
+                            </div>
+                        </div>
+
+                        <div class="dual-manual-pills">
+                            <div class="kg-pill" id="pill-start">
+                                <div class="kg-pill-tag">K</div>
+                                <input type="text" id="startTimePill" class="kg-pill-input keypad-bound-input" value="" inputmode="none" autocomplete="off" autocorrect="off" spellcheck="false" readonly placeholder="hh:mm" aria-label="Kommen hh:mm">
+                            </div>
+                            <div class="kg-pill" id="pill-end">
+                                <div class="kg-pill-tag">G</div>
+                                <input type="text" id="endTimePill" class="kg-pill-input keypad-bound-input" value="" inputmode="none" autocomplete="off" autocorrect="off" spellcheck="false" readonly placeholder="hh:mm" aria-label="Gehen hh:mm">
+                            </div>
+                        </div>
+
+                        <div class="stamp-btn-row">
+                            <button type="button" class="btn-stamp is-primary-active" id="btn-now-start">Kommen</button>
+                            <button type="button" class="btn-stamp is-secondary-active" id="btn-now-end">Gehen</button>
+                            <button type="button" class="btn-undo" id="btn-undo" title="Letzte Eingabe rückgängig" aria-label="Rückgängig" disabled>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round">
+                                    <path d="M9 14L4 9l5-5"></path>
+                                    <path d="M20 20v-7a4 4 0 0 0-4-4H4"></path>
+                                </svg>
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
 
+            <!-- SCREEN 3: WOCHE -->
             <div id="view-week" class="view-section">
-                <div class="feature-section">
-                    <div class="week-header">
-                        <div class="week-title-col">
-                            <h2>Wochenbilanz</h2>
-                            <button type="button" class="btn-jump-today" id="btn-jump-today">↺ Heute</button>
+                <div class="feature-section" id="week-feature-card">
+                    <div class="week-window-card">
+                        <div id="week-days-container"></div>
+                        <button type="button" class="btn-add-day-entry" id="btn-open-backfill-modal">
+                            <span>+ Tag / Wochenende nachtragen</span>
+                        </button>
+                    </div>
+
+                    <div class="week-switcher-row">
+                        <div class="kw-merged-swipebar" id="kw-merged-swipebar">
+                            <button type="button" class="kw-edge-zone" id="btn-prev-week" title="Vorherige KW">‹ Vorherige</button>
+                            <button type="button" class="kw-center-zone" id="week-kw-badge" title="Tippen für aktuelle KW">
+                                <span class="kw-center-title" id="week-kw-main">KW -</span>
+                            </button>
+                            <button type="button" class="kw-edge-zone" id="btn-next-week" title="Nächste KW">Nächste ›</button>
                         </div>
-                        <div class="week-nav-cluster">
-                            <div class="date-jump-wrap" title="Zu Datum springen">
-                                <div class="btn-date-jump">
-                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                                        <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                                        <line x1="16" y1="2" x2="16" y2="6"></line>
-                                        <line x1="8" y1="2" x2="8" y2="6"></line>
-                                        <line x1="3" y1="10" x2="21" y2="10"></line>
-                                    </svg>
-                                </div>
-                                <input type="date" class="hidden-date-picker" id="week-date-picker" aria-label="Datum auswählen">
+                        <div class="date-jump-wrap" title="Zu Datum springen">
+                            <div class="btn-date-jump">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                                </svg>
                             </div>
-                            <div class="kw-vertical-nav">
-                                <button type="button" class="kw-v-btn" id="btn-prev-week" title="Vorherige Woche">▲</button>
-                                <span class="kw-badge" id="week-kw-badge" title="Zur aktuellen Woche">KW -</span>
-                                <button type="button" class="kw-v-btn" id="btn-next-week" title="Nächste Woche">▼</button>
-                            </div>
+                            <input type="date" class="hidden-date-picker" id="week-date-picker" aria-label="Datum auswählen">
                         </div>
                     </div>
 
-                    <div class="week-list-card" id="week-days-container"></div>
-
-                    <button type="button" class="btn-add-day-entry" id="btn-open-backfill-modal">
-                        <span>+ Tag / Wochenende nachtragen</span>
-                    </button>
-
-                    <div class="output-decimal-container">
+                    <div class="output-decimal-container week-summary-pair">
                         <div class="output-decimal">
                             <h3 id="label-week-worked">Geleistet (Ist)</h3>
                             <div id="output-week-worked">-</div>
-                            <div class="balance-sub" id="output-week-soll">von 40:00 h Soll</div>
                         </div>
                         <div class="output-decimal">
                             <h3 id="label-week-total">Wochen-Saldo</h3>
                             <div id="output-week-total">-</div>
-                            <div class="balance-sub" id="output-week-decimal">0,00 h</div>
                         </div>
                     </div>
-
-                    <button type="button" class="btn-open-pdf-export" id="btn-open-pdf-modal">
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                            <polyline points="14 2 14 8 20 8"></polyline>
-                            <line x1="12" y1="18" x2="12" y2="12"></line>
-                            <polyline points="9 15 12 18 15 15"></polyline>
-                        </svg>
-                        <span>Monatsübersicht als PDF</span>
-                    </button>
 
                     <div class="glz-pill-wrap">
                         <div id="glzPill" class="glz-pill ampel-gruen">
@@ -261,29 +319,77 @@
                             <span id="glzPillText">GLZ: +0,00h (Grün · noch 40,0h bis Gelb)</span>
                         </div>
                     </div>
-                    <div class="spatial-nav-pills">
-                        <button type="button" class="spatial-nav-btn" id="nav-btn-home-from-week">⌂ Wischschirm</button>
-                        <button type="button" class="spatial-nav-btn" id="nav-btn-clock-from-week">← Stempeluhr</button>
-                    </div>
                 </div>
             </div>
         </div>
+
+        <!-- UNTERE DAUMENZONE-NAVIGATION -->
+        <nav class="bottom-thumb-nav" id="bottom-thumb-nav" aria-label="Hauptnavigation">
+            <button type="button" class="thumb-nav-btn is-current" id="btn-nav-today" aria-label="Heute / Uhr">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <circle cx="12" cy="12" r="9"></circle>
+                    <polyline points="12 7 12 12 15 14"></polyline>
+                </svg>
+                <span>Uhr</span>
+            </button>
+            <button type="button" class="thumb-nav-btn" id="btn-toggle-view" aria-label="Woche">
+                <svg id="icon-view-week" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="20" x2="18" y2="10"></line>
+                    <line x1="12" y1="20" x2="12" y2="4"></line>
+                    <line x1="6" y1="20" x2="6" y2="14"></line>
+                </svg>
+                <svg id="icon-view-clock" style="display:none;" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                </svg>
+                <span id="label-nav-week">Woche</span>
+            </button>
+            <button type="button" class="thumb-nav-btn" id="btn-settings" aria-label="Menü">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+                    <line x1="4" y1="6" x2="20" y2="6"></line>
+                    <line x1="4" y1="12" x2="20" y2="12"></line>
+                    <line x1="4" y1="18" x2="20" y2="18"></line>
+                </svg>
+                <span>Menü</span>
+            </button>
+        </nav>
     </div>
 
-    <!-- MODAL: WIDGET-KATALOG -->
-    <div class="modal-overlay" id="widget-catalog-modal">
-        <div class="modal-content">
-            <button class="close-btn" id="btn-close-widget-catalog">&times;</button>
-            <h2>Home-Widgets wählen</h2>
-            <div class="widget-catalog-list" id="widget-catalog-list"></div>
-            <button class="settings-save" id="btn-done-widget-catalog">Übernehmen</button>
+    <!-- GLOBALE ZAHLENTASTATUR (4 TASTEN IN REIHE 4: ,  0  .  ↵) -->
+    <div class="custom-keypad-sheet" id="custom-keypad-sheet" role="region" aria-label="Zahlentastatur">
+        <div class="keypad-topbar">
+            <span class="keypad-target-badge" id="keypad-target-badge">Kommen (hh:mm)</span>
+            <button type="button" class="keypad-close-btn" id="keypad-close-btn">Fertig</button>
+        </div>
+        <div class="keypad-grid">
+            <button type="button" class="kp-key" data-kp="1">1</button>
+            <button type="button" class="kp-key" data-kp="2">2</button>
+            <button type="button" class="kp-key" data-kp="3">3</button>
+            <button type="button" class="kp-key kp-op" data-kp="-" title="Minus">−</button>
+
+            <button type="button" class="kp-key" data-kp="4">4</button>
+            <button type="button" class="kp-key" data-kp="5">5</button>
+            <button type="button" class="kp-key" data-kp="6">6</button>
+            <button type="button" class="kp-key kp-op" data-kp="+" title="Plus">+</button>
+
+            <button type="button" class="kp-key" data-kp="7">7</button>
+            <button type="button" class="kp-key" data-kp="8">8</button>
+            <button type="button" class="kp-key" data-kp="9">9</button>
+            <button type="button" class="kp-key kp-del" data-kp="del" title="Löschen" aria-label="Löschen">⌫</button>
+
+            <button type="button" class="kp-key kp-op" data-kp="," title="Komma">,</button>
+            <button type="button" class="kp-key" data-kp="0" title="Null">0</button>
+            <button type="button" class="kp-key kp-op" data-kp="." title="Punkt">.</button>
+            <button type="button" class="kp-key kp-enter" data-kp="enter" title="Enter" aria-label="Enter">↵</button>
         </div>
     </div>
 
     <!-- MODAL: TAG NACHTRAGEN -->
     <div class="modal-overlay" id="backfill-modal">
         <div class="modal-content">
-            <button class="close-btn" id="btn-close-backfill-modal">&times;</button>
+            <button type="button" class="close-btn" id="btn-close-backfill-modal">&times;</button>
             <h2>Tag nachtragen</h2>
             <div class="settings-group">
                 <label>Wochenende der angezeigten KW:</label>
@@ -296,14 +402,14 @@
                 <label for="backfillDateInput">Oder beliebiges Datum wählen:</label>
                 <input type="date" id="backfillDateInput" class="text-input-full">
             </div>
-            <button class="settings-save" id="btn-confirm-backfill">Zeiten für diesen Tag eintragen</button>
+            <button type="button" class="settings-save" id="btn-confirm-backfill">Zeiten für diesen Tag eintragen</button>
         </div>
     </div>
 
     <!-- MODAL: MONATS-PDF -->
     <div class="modal-overlay" id="pdf-export-modal">
         <div class="modal-content">
-            <button class="close-btn" id="btn-close-pdf-modal">&times;</button>
+            <button type="button" class="close-btn" id="btn-close-pdf-modal">&times;</button>
             <h2>Monats-PDF Export</h2>
             <div class="settings-group">
                 <label for="pdfMonthSelect">Monat auswählen</label>
@@ -313,7 +419,7 @@
                 <label for="pdfUserNamePreview">Name auf dem Stundenzettel</label>
                 <input type="text" id="pdfUserNamePreview" class="text-input-full" placeholder="Dein Name">
             </div>
-            <div style="background:var(--bg-color); padding:10px 12px; border-radius:8px; border:1px solid var(--border-color); font-size:0.84em; margin-bottom:10px; line-height:1.4;">
+            <div class="pdf-info-tile">
                 Erstellt eine druckfertige DIN-A4-PDF-Datei mit allen Tagen des Monats, Kommen/Gehen-Zeiten, Pausen, Status, Gesamtsaldo sowie Unterschriftszeile.
             </div>
             <div class="settings-group">
@@ -324,14 +430,14 @@
                     </label>
                 </div>
             </div>
-            <button class="settings-save" id="btn-download-month-pdf">PDF jetzt herunterladen</button>
+            <button type="button" class="settings-save" id="btn-download-month-pdf">PDF jetzt herunterladen</button>
         </div>
     </div>
 
     <!-- MODAL: TAG BEARBEITEN -->
     <div class="modal-overlay" id="day-editor-modal">
         <div class="modal-content">
-            <button class="close-btn" id="btn-close-day-editor">&times;</button>
+            <button type="button" class="close-btn" id="btn-close-day-editor">&times;</button>
             <h2 id="day-editor-title">Tag bearbeiten</h2>
 
             <div class="day-status-grid" id="day-status-chips">
@@ -356,23 +462,22 @@
                 </div>
             </div>
 
-            <div id="day-editor-nonwork-note" style="display:none; background:var(--bg-color); padding:14px; border-radius:10px; text-align:center; margin-bottom:14px; font-size:0.92em;">
+            <div class="editor-nonwork-tile" id="day-editor-nonwork-note" style="display:none;">
                 Für diesen Status wird keine Arbeitszeit gestempelt.
             </div>
 
             <button type="button" class="btn-reset-day" id="btn-reset-day-editor">🗑 Tag zurücksetzen / Zeiten löschen</button>
-            <button class="settings-save" id="btn-save-day-editor">Übernehmen & Schließen</button>
+            <button type="button" class="settings-save" id="btn-save-day-editor">Übernehmen & Schließen</button>
         </div>
     </div>
 
-    <!-- MODAL: EINSTELLUNGEN -->
+    <!-- SCREEN 4: MENÜ (EINSTELLUNGEN + 3 UNTERMENÜS) -->
     <div class="modal-overlay" id="settings-modal">
         <div class="modal-content" id="settings-modal-card">
-            <button class="close-btn" id="btn-close-settings">&times;</button>
+            <button type="button" class="close-btn" id="btn-close-settings">&times;</button>
 
-            <!-- HAUPTANSICHT -->
             <div id="settings-page-main">
-                <h2>Einstellungen</h2>
+                <h2>Menü</h2>
 
                 <div class="settings-group">
                     <input type="text" id="userNameInput" class="text-input-full" placeholder="Dein Name" aria-label="Dein Name">
@@ -391,10 +496,22 @@
                 </div>
 
                 <div class="settings-group">
+                    <button type="button" class="settings-nav-card" id="btn-open-widgets-subpage">
+                        <div class="settings-nav-info">
+                            <strong>Widgets</strong>
+                            <span id="nav-widgets-summary">Pausenwächter aktiv · Beides</span>
+                        </div>
+                        <div class="settings-nav-right">
+                            <span class="nav-chevron">›</span>
+                        </div>
+                    </button>
+                </div>
+
+                <div class="settings-group">
                     <button type="button" class="settings-nav-card" id="btn-open-design-subpage">
                         <div class="settings-nav-info">
                             <strong>Darstellung & Design</strong>
-                            <span id="nav-design-summary">Klassisch · 3 Widgets · 2 Scribbles</span>
+                            <span id="nav-design-summary">Klassisch · 2 Scribbles</span>
                         </div>
                         <div class="settings-nav-right">
                             <div class="nav-color-preview">
@@ -408,15 +525,6 @@
                 </div>
 
                 <div class="settings-group">
-                    <div class="setting-box-row">
-                        <label class="toggle-label-nowrap" for="gesturesEnabledCheck">
-                            <input type="checkbox" id="gesturesEnabledCheck" checked>
-                            <span>👆 Wischgesten aktiv</span>
-                        </label>
-                    </div>
-                </div>
-
-                <div class="settings-group">
                     <div class="backup-card">
                         <div class="backup-card-top">
                             <span class="backup-card-title">Datensicherung</span>
@@ -426,19 +534,27 @@
                             <button type="button" class="btn-backup-action" id="btn-export-backup">💾 Sichern</button>
                             <button type="button" class="btn-backup-action" id="btn-import-backup">📂 Laden</button>
                         </div>
+                        <button type="button" class="btn-open-pdf-export" id="btn-open-pdf-modal">
+                            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+                                <polyline points="14 2 14 8 20 8"></polyline>
+                                <line x1="12" y1="18" x2="12" y2="12"></line>
+                                <polyline points="9 15 12 18 15 15"></polyline>
+                            </svg>
+                            <span>Monatsübersicht als PDF</span>
+                        </button>
                         <input type="file" id="backup-file-input" accept=".json,application/json" style="display:none;">
                     </div>
                 </div>
 
                 <div class="version-update-bar">
-                    <span id="app-version-label" style="font-weight:bold;">Version 1.24</span>
+                    <span id="app-version-label" style="font-weight:bold;">Version 2.0.0</span>
                     <button type="button" class="btn-force-update" id="btn-force-update">↻ Update erzwingen</button>
                 </div>
 
-                <button class="settings-save" id="btn-save-settings">Speichern & Schließen</button>
+                <button type="button" class="settings-save" id="btn-save-settings">Speichern & Schließen</button>
             </div>
 
-            <!-- UNTERMENÜ 1: ARBEITSZEIT & PAUSEN -->
             <div id="settings-page-work" style="display: none;">
                 <div class="subpage-header">
                     <button type="button" class="btn-subpage-back" id="btn-back-from-work">← Zurück</button>
@@ -448,36 +564,36 @@
                 <div class="design-sub-card">
                     <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Tägliche Sollarbeitszeit (Mo–Fr)</label>
                     <div class="soll-pair">
-                        <input type="number" id="sollHours" min="0" max="24" value="8" inputmode="numeric">
+                        <input type="text" id="sollHours" class="keypad-bound-input" value="8" inputmode="none" readonly aria-label="Soll Stunden">
                         <span style="font-weight:bold;">:</span>
-                        <input type="number" id="sollMinutes" min="0" max="59" value="0" inputmode="numeric">
-                        <span style="font-size:0.86em; opacity:0.8;">Std : Min</span>
+                        <input type="text" id="sollMinutes" class="keypad-bound-input" value="0" inputmode="none" readonly aria-label="Soll Minuten">
+                        <span style="font-size:0.86em; opacity:0.85;">Std : Min</span>
                     </div>
                 </div>
 
                 <div class="design-sub-card">
-                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Pausen-Vorwarnung (Push)</label>
-                    <div class="setting-box-row" style="background:var(--white);">
+                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Pausen-Vorwarnung (PWA)</label>
+                    <div class="setting-box-row">
                         <label class="toggle-label-nowrap" for="pauseNotifyCheck">
                             <input type="checkbox" id="pauseNotifyCheck">
                             <span>🔔 Vor 30m/45m warnen</span>
                         </label>
                         <div class="smoker-mins-wrap" id="pauseNotifyMinsWrap">
-                            <input type="number" id="pauseNotifyLeadInput" min="1" max="60" value="10" inputmode="numeric">
+                            <input type="text" id="pauseNotifyLeadInput" class="keypad-bound-input" value="10" inputmode="none" readonly aria-label="Vorwarnzeit Minuten">
                             <span>Min vorher</span>
                         </div>
                     </div>
                 </div>
 
                 <div class="design-sub-card">
-                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Raucherpausen im Menü</label>
-                    <div class="setting-box-row" style="background:var(--white);">
+                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Raucherpausen auf Uhr</label>
+                    <div class="setting-box-row">
                         <label class="toggle-label-nowrap" for="isSmokerCheck">
                             <input type="checkbox" id="isSmokerCheck">
                             <span>🚬 Button anzeigen</span>
                         </label>
                         <div class="smoker-mins-wrap" id="smokerMinsWrap">
-                            <input type="number" id="smokeMinutesInput" min="1" max="60" value="5" inputmode="numeric">
+                            <input type="text" id="smokeMinutesInput" class="keypad-bound-input" value="5" inputmode="none" readonly aria-label="Raucherpause Minuten">
                             <span>Min/Gang</span>
                         </div>
                     </div>
@@ -485,13 +601,13 @@
 
                 <div class="design-sub-card">
                     <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:4px;">Ampelkonto (GBV § 5)</label>
-                    <div style="font-size:0.75em; opacity:0.78; margin-bottom:7px; line-height:1.3;">
+                    <div style="font-size:0.76em; opacity:0.86; margin-bottom:7px; line-height:1.3;">
                         Stand der echten Stempeluhr vor Arbeitsbeginn am Stichtag eintragen:
                     </div>
                     <div class="ampel-settings-grid">
                         <div class="ampel-field-box">
                             <span>GLZ-Startsaldo (h)</span>
-                            <input type="number" id="glzBaseInput" step="0.01" value="0" inputmode="decimal">
+                            <input type="text" id="glzBaseInput" class="keypad-bound-input" value="0" inputmode="none" readonly aria-label="GLZ Startsaldo">
                         </div>
                         <div class="ampel-field-box">
                             <span>Stichtag (ab Datum)</span>
@@ -499,7 +615,7 @@
                         </div>
                         <div class="ampel-field-box" style="grid-column: 1 / -1; margin-top: 2px;">
                             <span>Vertragliche Wochenstunden</span>
-                            <input type="number" id="weeklyHoursInput" step="0.5" min="1" max="48" value="40" inputmode="decimal">
+                            <input type="text" id="weeklyHoursInput" class="keypad-bound-input" value="40" inputmode="none" readonly aria-label="Wochenstunden">
                         </div>
                     </div>
                 </div>
@@ -507,16 +623,42 @@
                 <button type="button" class="settings-save" id="btn-done-work">Fertig</button>
             </div>
 
-            <!-- UNTERMENÜ 2: DARSTELLUNG & DESIGN -->
+            <!-- UNTERMENÜ: WIDGETS -->
+            <div id="settings-page-widgets" style="display: none;">
+                <div class="subpage-header">
+                    <button type="button" class="btn-subpage-back" id="btn-back-from-widgets">← Zurück</button>
+                    <h2>Widgets</h2>
+                </div>
+
+                <div class="design-sub-card">
+                    <div class="setting-box-row" style="margin-bottom: 8px;">
+                        <label class="toggle-label-nowrap" for="pauseWatcherEnabledCheck">
+                            <input type="checkbox" id="pauseWatcherEnabledCheck" checked>
+                            <span>⏱️ Pausenwächter</span>
+                        </label>
+                    </div>
+
+                    <div id="pause-watcher-options-wrap">
+                        <label style="display:block; font-weight:bold; font-size:0.84em; margin-bottom:6px;">Startbildschirm-Modus</label>
+                        <div class="widget-mode-pills" id="pause-watcher-mode-pills" role="radiogroup" aria-label="Startbildschirm-Modus">
+                            <button type="button" class="widget-mode-pill" data-pw-mode="go">Nur bei Gehen</button>
+                            <button type="button" class="widget-mode-pill" data-pw-mode="come">Nur bei Kommen</button>
+                            <button type="button" class="widget-mode-pill" data-pw-mode="both">Beides</button>
+                        </div>
+                    </div>
+
+                    <div style="font-size:0.76em; opacity:0.86; margin-top:8px; line-height:1.35;">
+                        Zeigt bei laufender Stempelung den Countdown bis zur 30-Min-Grenze (06:00:00 Netto) und danach den 45er-Warner bis zur 9:00-Std-Grenze – inkl. Anrechnung ausgestempelter Pausen.
+                    </div>
+                </div>
+
+                <button type="button" class="settings-save" id="btn-done-widgets">Fertig</button>
+            </div>
+
             <div id="settings-page-design" style="display: none;">
                 <div class="subpage-header">
                     <button type="button" class="btn-subpage-back" id="btn-back-from-design">← Zurück</button>
                     <h2>Darstellung & Design</h2>
-                </div>
-
-                <div class="design-sub-card">
-                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Home-Screen Widgets (Kommen & Gehen)</label>
-                    <button type="button" class="btn-backup-action" id="btn-open-home-widget-editor" style="width:100%;">⊞ Widgets auf Home-Screen anpassen</button>
                 </div>
 
                 <div class="design-sub-card">
@@ -535,7 +677,7 @@
                 </div>
 
                 <div class="design-sub-card color-wheel-container">
-                    <label style="width:100%; font-weight:bold; font-size:0.9em; margin-bottom:6px;">Farbharmonie (120° Triadisch)</label>
+                    <label style="width:100%; font-weight:bold; font-size:0.9em; margin-bottom:6px;">OKLCH-Farbharmonie (Kontrast-Garantie)</label>
                     <canvas id="colorWheel" width="165" height="165"></canvas>
                     <div class="color-preview">
                         <div class="color-dot dot-1" title="Text & Rahmen"></div>
@@ -544,25 +686,55 @@
                     </div>
                     <div class="slider-control">
                         <label for="lightnessSlider">
-                            <span>Helligkeit Buttons:</span>
-                            <span><span id="lightnessVal">46</span>%</span>
+                            <span>Helligkeit Kacheln:</span>
+                            <span><span id="lightnessVal">44</span>%</span>
                         </label>
-                        <input type="range" id="lightnessSlider" min="28" max="52" value="46">
+                        <input type="range" id="lightnessSlider" min="28" max="52" value="44">
+                    </div>
+                </div>
+
+                <div class="scribble-accordion-card" id="scribble-accordion-card">
+                    <button type="button" class="scribble-accordion-btn" id="btn-toggle-scribble-accordion" aria-expanded="false">
+                        <div class="scribble-accordion-title-wrap">
+                            <span class="scribble-accordion-title">Start-Scribbles (32 Motive)</span>
+                            <span class="scribble-accordion-meta" id="scribble-accordion-meta">2/5 aktiv · Größe 50% · Antippen zum Aufklappen</span>
+                        </div>
+                        <div class="scribble-accordion-right">
+                            <div class="scribble-mini-strip" id="scribble-mini-strip"></div>
+                            <span class="scribble-chevron" id="scribble-chevron">›</span>
+                        </div>
+                    </button>
+
+                    <div class="scribble-accordion-body" id="scribble-accordion-body">
+                        <div class="scribble-picker-head">
+                            <span style="font-size:0.8em; font-weight:bold;">Motive wählen (max. 5)</span>
+                            <span class="scribble-count-tag" id="scribble-count-tag">2 / 5</span>
+                        </div>
+                        <div class="scribble-svg-grid" id="scribble-svg-grid"></div>
+                        <div class="slider-control">
+                            <label for="scribbleSizeSlider">
+                                <span>Scribble-Größe:</span>
+                                <span><span id="scribbleSizeVal">50</span>%</span>
+                            </label>
+                            <input type="range" id="scribbleSizeSlider" min="15" max="100" value="50">
+                        </div>
                     </div>
                 </div>
 
                 <div class="design-sub-card">
-                    <div class="scribble-picker-head">
-                        <label style="font-weight:bold; font-size:0.9em;">Startbildschirm-Scribbles</label>
-                        <span class="scribble-count-tag" id="scribble-count-tag">2 / 5</span>
+                    <label style="display:block; font-weight:bold; font-size:0.9em; margin-bottom:7px;">App-Icon (für Startbildschirm)</label>
+                    <div class="icon-variant-grid" id="icon-variant-grid">
+                        <button type="button" class="icon-variant-card selected" data-icon-theme="blue">
+                            <img src="./favicon_192.png" alt="Blau / Cyan">
+                            <span>Blau / Cyan</span>
+                        </button>
+                        <button type="button" class="icon-variant-card" data-icon-theme="rose">
+                            <img src="./favicon_rose_192.png" alt="Rosé / Berry">
+                            <span>Rosé / Berry</span>
+                        </button>
                     </div>
-                    <div class="scribble-svg-grid" id="scribble-svg-grid"></div>
-                    <div class="slider-control">
-                        <label for="scribbleSizeSlider">
-                            <span>Symbolgröße:</span>
-                            <span><span id="scribbleSizeVal">50</span>%</span>
-                        </label>
-                        <input type="range" id="scribbleSizeSlider" min="15" max="100" value="50">
+                    <div class="icon-install-hint">
+                        Hinweis: Vor dem Tippen auf „App installieren“ auswählen, damit das gewünschte Icon auf dem Startbildschirm landet.
                     </div>
                 </div>
 
@@ -570,5 +742,11 @@
             </div>
         </div>
     </div>
+
+    <script>
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('./sw.js?v=200');
+      }
+    </script>
 </body>
 </html>
